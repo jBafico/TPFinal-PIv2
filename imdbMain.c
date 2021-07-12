@@ -121,12 +121,15 @@ void query1(FILE *arch, imdbADT imdb)
 void query2(FILE * arch, imdbADT imdb) {
     toBegin(imdb);
     fprintf(arch, "%s;%s;%s\n", "year", "genre", "films");
+    unsigned int year, cantMovies;
     while (hasNext(imdb)) {
-        tListYear year = next(imdb);
-        tListGenre aux = year->firstGenre;
-        for (; aux != NULL; aux = aux->tail) {
-            fprintf(arch, "%d;%s;%d\n", year->year, aux->genre, aux->cantMovies);
+        year=getYear(imdb);
+        while(hasNextGenre(imdb)){
+            char * genre=getGenre(imdb, &cantMovies);
+            fprintf(arch, "%d;%s;%d\n", year, genre, cantMovies);
+            free(genre);
         }
+
     }
     fclose(arch);
 }
@@ -158,6 +161,17 @@ void query4(FILE* out,imdbADT imdb)
     fprintf(out,"%d,%s,%lu,%.1f\n",list->head.year,list->head.title,list->head.votes,list->head.rating);
      */
     fclose(out);
+}
+
+void query6(FILE* arch, imdbADT imdb){
+    toBeginLimitedGenres(imdb);
+    fprintf(arch, "%s;%s;%s\n", "genre", "min", "max");
+    float min, max;
+    while(hasNextLimitedGenres(imdb)){
+        char * genre=getLimitedGenre(imdb, &min, &max);
+        fprintf(arch, "%s;%.2f;%.2f", genre, min, max);
+        free(genre);
+    }
 }
 
 char ** copyGenres(char * genresToDivide, unsigned int * dim){

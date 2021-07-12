@@ -85,9 +85,10 @@ typedef struct imdbCDT
 {
     tListYear first;
     //iterador por años
-    tListYear current;
+    tListYear currentYear;
     tMPData MPData;
     tNodeLimitedYear limitedYear;
+    tListGenre currentGenre;
 } imdbCDT;
 
 static char *
@@ -299,20 +300,59 @@ void receiveYears(imdbADT imdb, int startYear, int endYear){
 
 void toBegin(imdbADT imdb)
 {
-    imdb->current = imdb->first;
+    imdb->currentYear = imdb->first;
 }
 
 int hasNext(imdbADT imdb)
 {
-    return imdb->current != NULL;
+    return imdb->currentYear != NULL;
 }
 
-tListYear next(imdbADT imdb)
+static tListYear next(imdbADT imdb)
 {
-    tListYear toReturn = imdb->current;
-    imdb->current = imdb->current->tail;
+    tListYear toReturn = imdb->currentYear;
+    imdb->currentYear = imdb->currentYear->tail;
     return toReturn;
 }
+
+static tListYear searchYear(tListYear first, int year){
+    if (first == NULL || first->year>year)
+        return NULL;
+    if (first->year== year)
+        return first;
+    return searchYear(first->tail, year);
+}
+
+void toBeginGenre(imdbADT imdb, int year){
+    tListYear aux=searchYear(imdb->first, year);
+    if(aux!=NULL){
+        imdb->currentGenre=aux->firstGenre;
+    }
+}
+
+int hasNextGenre(imdbADT imdb){
+    return imdb->currentGenre != NULL;
+}
+
+static tListGenre nextGenre(imdbADT imdb)
+{
+    tListGenre toReturn = imdb->currentGenre;
+    imdb->currentGenre = imdb->currentGenre->tail;
+    return toReturn;
+}
+
+unsigned int getYear(imdbADT imdb){
+    tListYear aux=next(imdb);
+    return aux->year;
+}
+
+char * getGenre(imdbADT imdb, unsigned int * cant){
+    tListGenre aux=nextGenre(imdb);
+    char * string=copy(aux->genre);
+    *cant=aux->cantMovies;
+    return string;
+}
+
 
 void toBeginLimitedGenres(imdbADT imdb){
     imdb->limitedYear.currentGenre= imdb->limitedYear.firstGenreRating;
@@ -322,9 +362,17 @@ int hasNextLimitedGenres(imdbADT imdb){
     return imdb->limitedYear.currentGenre!=NULL;
 }
 
-tListGenreRating nextLimitedGenres(imdbADT imdb){
+static tListGenreRating nextLimitedGenres(imdbADT imdb){
     tListGenreRating aux=imdb->limitedYear.currentGenre;
     imdb->limitedYear.currentGenre=imdb->limitedYear.currentGenre->tail;
     return aux;
+}
+
+char * getLimitedGenre(imdbADT imdb, float * min, float * max){
+    tListGenreRating aux= nextLimitedGenres(imdb);
+    char * string=copy(aux->genre);
+    *min=aux->minRating;
+    *max=aux->maxRating;
+    return string;
 }
 
