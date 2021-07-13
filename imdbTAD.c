@@ -33,6 +33,10 @@ typedef struct tNodeLimitedYear
     tListGenreRating currentGenre;
     unsigned int seriesSize; //dim de lista de q5
     tListMPS seriesFirst;    //lista de q5
+    char vecInitialized;// flag del vector, marca si esta inicializado o no
+    tListMPS* vec;// vector dinamico de tlistMPS, punteros a struct 
+    char iteratevecindex;// indice del vector, herramienta para iterar
+
 } tNodeLimitedYear;
 
 //Q2 RELATED STRUCT
@@ -241,6 +245,7 @@ void MPM(imdbADT imdb, tNode newNode, unsigned int startYear)
     imdb->MPData.movieFirst = addRecMPM(imdb->MPData.movieFirst, newNodeMPM.head /*, controlFlag*/);
 }
 
+
 //las 3 funciones de abajo son de la query 5
 static tListMPS addRecMPS(tListMPS list, tElemMPS elem /*, int * controlFlag*/) //va a estar ordenada de men a may rating
 {
@@ -258,6 +263,7 @@ static tListMPS addRecMPS(tListMPS list, tElemMPS elem /*, int * controlFlag*/) 
     return list;
 }
 
+
 static tListMPS deletefirstS(tListMPS first)
 {
     tListMPS aux = first->tail;
@@ -266,26 +272,26 @@ static tListMPS deletefirstS(tListMPS first)
     return aux;
 }
 
+
 void MPS(imdbADT imdb, tNode newNode, unsigned int startYear, unsigned int endYear)
 {
-    if (newNode.votes < MINVOTES)
+    // R : se chequea que la serie no haya terminado en este periodo de años, osea que el endig year sea menor que el end posta 
+    if (newNode.votes < MINVOTES || ( endYear != 0 && endYear < imdb->limitedYear.minYear) )
         return;
-
     if (imdb->limitedYear.seriesSize == MP_MAX && ((imdb->limitedYear.seriesFirst->head.rating > newNode.rating) || ((imdb->limitedYear.seriesFirst->head.rating == newNode.rating) && imdb->limitedYear.seriesFirst->head.votes >= newNode.votes)))
         return;
-
-    tNodeMPS newNodeMPS;
-    newNodeMPS.head.votes = newNode.votes;
-    newNodeMPS.head.rating = newNode.rating;
-    newNodeMPS.head.startYear = startYear;
-    newNodeMPS.head.endYear = endYear;
-    newNodeMPS.head.title = copy(newNode.title /*, controlFlag*/);
-
+    // R : cambie el tipo de nodo que creabamos, estabamos gastando memoria al pedo porque siempre usabamos .head 
+    tElemMPS newNodeMPS;
+    newNodeMPS.votes = newNode.votes;
+    newNodeMPS.rating = newNode.rating;
+    newNodeMPS.startYear = startYear;
+    newNodeMPS.endYear = endYear;
+    newNodeMPS.title = copy(newNode.title /*, controlFlag*/);
     if (imdb->limitedYear.seriesSize == MP_MAX)
         imdb->limitedYear.seriesFirst = deletefirstS(imdb->limitedYear.seriesFirst);
     else
         imdb->limitedYear.seriesSize++;
-    imdb->limitedYear.seriesFirst = addRecMPS(imdb->limitedYear.seriesFirst, newNodeMPS.head /*, controlFlag*/);
+    imdb->limitedYear.seriesFirst = addRecMPS(imdb->limitedYear.seriesFirst, newNodeMPS, /*, controlFlag*/);
 }
 
 static tNode addType(tNode first, tNode node /*int * controlFlag*/)
@@ -478,7 +484,8 @@ int nextLimitedGenres(imdbADT imdb)
 {
     if (!hasNextLimitedGenres(imdb))
         //todo tema errores
-        imdb->limitedYear.currentGenre = imdb->limitedYear.currentGenre->tail;
+
+    imdb->limitedYear.currentGenre = imdb->limitedYear.currentGenre->tail;
     return OK;
 }
 
@@ -545,6 +552,7 @@ float getMostVotedMovieRating(imdbADT imdb)
     }
     return imdb->currentYear->mostVotedMovie.rating;
 }
+
 size_t getMostVotedMovieVotes(imdbADT imdb)
 {
     if (imdb->currentYear == NULL)
@@ -585,6 +593,75 @@ size_t getMostVotedSeriesVotes(imdbADT imdb)
         //todo tema errores
     }
     return imdb->currentYear->mostVotedSeries.votes;
+}
+
+
+static void copyTop100SeriesListToVecRec(tListMPS *vec,unsigned int size,tListMPS list)
+{
+    if ( list == NULL )
+        return;
+    vec[size - 1] = list;
+    copyTop100SeriesListToVecRec(list->tail,size - 1,list->tail);
+}
+
+static void copyTop100SeriesListToVec(imdbADT imdb)
+{
+    imdb->limitedYear.vec = malloc(imdb->limitedYear.seriesSize * sizeof(tListMPS));
+    copyTop100SeriesListToVecRec(imdb->limitedYear.vec,imdb->limitedYear.seriesSize,imdb->limitedYear.seriesFirst);
+    return;
+}
+
+
+void toBeginTop100Series(imdbADT imdb)
+{
+    if ( imdb->limitedYear.vecInitialized == 0)
+    {
+        imdb->limitedYear.vecInitialized = 1;// pongo flag de copiado
+        copyTop100SeriesListToVec(imdb);
+    }
+    imdb->limitedYear.iteratevecindex = 0;// seteo el primer index, itero sobre el vector de punteros
+    return;
+}
+
+int hasNextTop100Series(imdbADT imdb)
+{
+    return imdb->limitedYear.iteratevecindex != imdb->limitedYear.seriesSize;
+}
+
+int NextTop100Series(imdbADT imdb)
+{
+    if ( !hasNext(imdb) )
+    {
+        //fprintf(stderr,"uso indebido del next");
+        //exit(1);
+    }
+    // AVANZO EN LA POSICION DEL VECTOR
+    imdb->limitedYear.iteratevecindex += 1;
+    return OK;
+}
+
+// responsabilidad del usuario liberar
+char * getTop100SeriesName(imdbADT imdb)
+{
+    char *copyToReturn = copy(imdb->limitedYear.vec[imdb->limitedYear.iteratevecindex]->head.title);
+    //tema de errores
+    return copyToReturn;
+}
+
+
+unsigned int getTop100SeriesStartYear(imdbADT imdb)
+{
+    return imdb->limitedYear.vec[imdb->limitedYear.iteratevecindex]->head.startYear;
+}
+
+unsigned int getTop100SeriesEndYear(imdbADT imdb)
+{
+    return imdb->limitedYear.vec[imdb->limitedYear.iteratevecindex]->head.endYear;
+}
+
+float getTop100SeriesRating(imdbADT imdb)
+{
+    return imdb->limitedYear.vec[imdb->limitedYear.iteratevecindex]->head.rating;
 }
 
 static void freeRecGenre(tListGenre genre)

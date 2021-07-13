@@ -93,5 +93,26 @@ float getLimitedGenreMax(imdbADT imdb);
 //Libera todos los recursos reservados por el TAD
 void freeIMDB(imdbADT imdb);
 
+//inicia iterador de series
+void toBeginTop100Series(imdbADT imdb);
+
+//chequea si hay un siguiente
+int hasNextTop100Series(imdbADT imdb);
+
+//avanza al siguiente elemento
+int NextTop100Series(imdbADT imdb);
+
+//devuelve el nombre, ES NECESARIO LIBERARLO 
+char *getTop100SeriesName(imdbADT imdb);
+
+//devuelve startyear, año de inicio de la serie
+unsigned int getTop100SeriesStartYear(imdbADT imdb);
+
+//devuelve endyear, año final de la serie, cero si no tiene año final
+unsigned int getTop100SeriesEndYear(imdbADT imdb);
+
+//devuelve el rating de la serie
+float getTop100SeriesRating(imdbADT imdb);
+
 #endif //TPFINAL2_IMDBTAD_H
 
