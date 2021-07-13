@@ -35,6 +35,7 @@ void query1(FILE *arch, imdbADT imdb, unsigned int year);
 void query2(FILE * arch, imdbADT imdb, unsigned int year);
 void query3(FILE *arch, imdbADT imdb, unsigned int year);
 void query6(FILE* arch, imdbADT imdb);
+void closeFiles(FILE **filevec,int queryAmount);
 void skipline(FILE *arch);
 
 
@@ -101,6 +102,7 @@ int main(int argc,char *argv[])
         free(line);
         free(genres);
     }
+    fclose(arch);
     // inicializo los archivos
     FILE *q1 = fopen(FIRSTQUERY,"w");
     FILE *q2 = fopen(SECONDQUERY,"w");
@@ -124,7 +126,9 @@ int main(int argc,char *argv[])
         next(imdb);
     }
     query6(filevec[Q6], imdb);
-    //todo cerrar las Q1 Q2 Q3 Q4 Q5 Q6
+
+    closeFiles(filevec, QUERY_AMOUNT);
+
 }
 
 void skipline(FILE *arch)
@@ -220,6 +224,11 @@ char ** copyGenres(char * genresToDivide, unsigned int * dim){
     }
     *dim = i;
     return genres;
+}
+void closeFiles(FILE **filevec,int queryAmount){
+    for (int i = 0; i < queryAmount; ++i) {
+        fclose(filevec[i]);
+    }
 }
 
 void checkopen(FILE **filevec,int queryamount)
@@ -321,6 +330,7 @@ int checkarg(int argc,char *argv[],int *year1,int *year2)
         printf("el año ingresado es incorrecto\n");
         return NOTOK;
     }
+
     // si los años son validos reemplazo
     *year1 = firstyear;
     *year2 = secondyear;
