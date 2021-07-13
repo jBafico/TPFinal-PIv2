@@ -9,33 +9,39 @@
 #define MP_MAX 100
 
 typedef struct tNodeYear *tListYear;
-typedef struct tNodeMP * tListMP;
-typedef struct tNodeGenre * tListGenre;
-typedef struct tNodeGenreRating * tListGenreRating;
-typedef struct tNodeMPSeries * tListMPSeries;
+typedef struct tNodeMPM *tListMPM; //Most Popular Movies
+typedef struct tNodeMPS *tListMPS; //Most Popular Series
+typedef struct tNodeGenre *tListGenre;
+typedef struct tNodeGenreRating *tListGenreRating;
+typedef struct tNodeMPSeries *tListMPSeries;
 
 //Q6 RELATED STRUCT
-typedef struct tNodeGenreRating{
-    char * genre;
+typedef struct tNodeGenreRating
+{
+    char *genre;
     float minRating;
     float maxRating;
-    struct tNodeGenreRating * tail;
-}tNodeGenreRating;
+    struct tNodeGenreRating *tail;
+} tNodeGenreRating;
 
 //Q5 Y Q6 RELATED STRUCT
-typedef struct tNodeLimitedYear{
+typedef struct tNodeLimitedYear
+{
     int minYear;
     int maxYear;
     tListGenreRating firstGenreRating;
     tListGenreRating currentGenre;
-}tNodeLimitedYear;
+    unsigned int seriesSize; //dim de lista de q5
+    tListMPS seriesFirst;    //lista de q5
+} tNodeLimitedYear;
 
 //Q2 RELATED STRUCT
-typedef struct tNodeGenre{
-    char * genre;
+typedef struct tNodeGenre
+{
+    char *genre;
     unsigned int cantMovies;
-    struct tNodeGenre * tail;
-}tNodeGenre;
+    struct tNodeGenre *tail;
+} tNodeGenre;
 
 //Q3 RELATED STRUCT AND INFO SAVER
 typedef struct tNode
@@ -43,7 +49,7 @@ typedef struct tNode
     char *title;
     float rating;
     size_t votes;
-}tNode;
+} tNode;
 
 //Q1 Q2 Q3 RELATED STRUCT
 typedef struct tNodeYear
@@ -55,168 +61,237 @@ typedef struct tNodeYear
     tNode mostVotedSeries;
     tNode mostVotedMovie;
     tListGenre firstGenre;
-}tNodeYear;
+} tNodeYear;
 
-//Q4 y Q5 RELATED STRUCT
-typedef struct tElemMP{
+//Q4 RELATED STRUCT
+typedef struct tElemMPM
+{
     char *title;
-    int startYear;
-    int endYear; //va a valer -1 si se trata de una pelicula
+    unsigned int startYear;
     float rating;
     unsigned long votes;
-}tElemMP;
+} tElemMPM;
 
-//Q4 Y Q5 RELATED STRUCT
-typedef struct tNodeMP{
-    tElemMP head;
-    tListMP tail;
-}tNodeMP;
+//Q4 RELATED STRUCT
+typedef struct tNodeMPM
+{
+    tElemMPM head;
+    tListMPM tail;
+} tNodeMPM;
 
-//Q4 y Q5 RELATED STRUCT
-typedef struct tMPData{
+//los siguientes dos structs son parecidos a los anteriores dos structs
+//difieren en que los de abajo contienen endYear al tratarse de series
+//mientras que los de arriba representan peliculas por lo que no tienen ese campo
+
+//Q5 RELATED STRUCT
+typedef struct tElemMPS
+{
+    char *title;
+    unsigned startYear;
+    unsigned endYear;
+    float rating;
+    unsigned long votes;
+} tElemMPS;
+
+//Q5 RELATED STRUCT
+typedef struct tNodeMPS
+{
+    tElemMPS head;
+    tListMPS tail;
+} tNodeMPS;
+
+//Q4 RELATED STRUCT
+typedef struct tMPData
+{
     unsigned int movieSize; //el tamano de la lista de mostPopular, maximo 100
-    tListMP movieFirst;
-    unsigned int seriesSize;
-    tListMP seriesFirst;
-}tMPData;
+    tListMPM movieFirst;
+} tMPData;
 
 //MAIN STRUCT
 typedef struct imdbCDT
 {
     tListYear first;
-    //iterador por años
     tListYear currentYear;
     tMPData MPData;
     tNodeLimitedYear limitedYear;
     tListGenre currentGenre;
 } imdbCDT;
 
+imdbADT new ()
+{
+    return calloc(1, sizeof(imdbCDT));
+}
+
 static char *
-copy(const char * copyFrom){
-    unsigned int i=0, j=0;
-    char * copyTo = NULL;
-    for(; copyFrom[j]!='\0'; i++, j++){
-        if(i%BLOCK == 0){
-            copyTo=realloc(copyTo, sizeof(char) * (BLOCK + i));
+copy(const char *copyFrom)
+{
+    unsigned int i = 0, j = 0;
+    char *copyTo = NULL;
+    for (; copyFrom[j] != '\0'; i++, j++)
+    {
+        if (i % BLOCK == 0)
+        {
+            copyTo = realloc(copyTo, sizeof(char) * (BLOCK + i));
             //Checkear ERRORES
         }
-        copyTo[i]=copyFrom[j];
+        copyTo[i] = copyFrom[j];
     }
-    copyTo=realloc(copyTo, sizeof(char) * (i+1));
+    copyTo = realloc(copyTo, sizeof(char) * (i + 1));
     //Checkear ERRORES
-    copyTo[i]='\0';
+    copyTo[i] = '\0';
     return copyTo;
 }
 
 //Q2 related function) En esta funcion vemos si en la lista existe el genero aumenta el contador.
 // Si no existia el genero lo agrega
-static tListGenre addRecGenre(tListGenre first, char * genre){
+static tListGenre addRecGenre(tListGenre first, char *genre)
+{
     int c;
-    if(first ==NULL || (c=strcmp(genre, first->genre))<0){
-        tListGenre newGenre=malloc(sizeof(tNodeGenre));
+    if (first == NULL || (c = strcmp(genre, first->genre)) < 0)
+    {
+        tListGenre newGenre = malloc(sizeof(tNodeGenre));
         //todo Checkear ERRORES
-        newGenre->genre=copy(genre);
+        newGenre->genre = copy(genre);
         //todo Checkear ERRORES
-        newGenre->tail=first;
-        newGenre->cantMovies=1;
+        newGenre->tail = first;
+        newGenre->cantMovies = 1;
         return newGenre;
     }
-    if(c==0){
+    if (c == 0)
+    {
         (first->cantMovies)++;
         return first;
     }
-    first->tail=addRecGenre(first->tail, genre);
+    first->tail = addRecGenre(first->tail, genre);
     return first;
 }
 
 //Q6 related function) En esta funcion por cada genero que tenga la pelicula agarramos su rating
 //y revisamos si en cada genero supera el rating max o min ya establecidos y si asi es, lo updateamos.
 //si el genero no existia, lo agregamos
-static tListGenreRating addRecGenreRating(tListGenreRating first, char * genre, float rating){
+static tListGenreRating addRecGenreRating(tListGenreRating first, char *genre, float rating)
+{
     int c;
-    if(first==NULL || (c=strcmp(genre, first->genre))<0){
-        tListGenreRating newNode=malloc(sizeof(tNodeGenreRating));
+    if (first == NULL || (c = strcmp(genre, first->genre)) < 0)
+    {
+        tListGenreRating newNode = malloc(sizeof(tNodeGenreRating));
         //todo check ERRORES
-        newNode->genre=copy(genre);
+        newNode->genre = copy(genre);
         //todo check ERRORES
-        newNode->tail=first;
-        newNode->maxRating=rating;
-        newNode->minRating=rating;
+        newNode->tail = first;
+        newNode->maxRating = rating;
+        newNode->minRating = rating;
         return newNode;
     }
-    if(c==0){
-        if(rating>first->maxRating)
-            first->maxRating=rating;
-        else if(rating<first->minRating)
-            first->minRating=rating;
+    if (c == 0)
+    {
+        if (rating > first->maxRating)
+            first->maxRating = rating;
+        else if (rating < first->minRating)
+            first->minRating = rating;
         return first;
     }
-    first->tail=addRecGenreRating(first->tail, genre, rating);
+    first->tail = addRecGenreRating(first->tail, genre, rating);
     return first;
 }
 
-static tListMP addRecMP(tListMP list,tElemMP elem/*, int * controlFlag*/) //va a estar ordenada de men a may rating
+//las 3 funciones de abajo son de la query 4
+static tListMPM addRecMPM(tListMPM list, tElemMPM elem /*, int * controlFlag*/) //va a estar ordenada de men a may rating
 {
-    if ( list == NULL || list->head.rating > elem.rating || ((list->head.rating == elem.rating) && (elem.votes <= list->head.votes)) ){
-        tListMP newnode = malloc(sizeof(tNodeMP));
+    if (list == NULL || list->head.rating > elem.rating || ((list->head.rating == elem.rating) && (elem.votes <= list->head.votes)))
+    {
+        tListMPM newnode = malloc(sizeof(tNodeMPM));
         /**controlFlag=checkNULL(newnode);
         if(*controlFlag==ERROR_CODE)
             return NULL;*/
-            //todo fijarse que las pelis van a tener endYear tmb
         newnode->head = elem;
         newnode->tail = list;
         return newnode;
     }
-    list->tail = addRecMP(list->tail,elem);
+    list->tail = addRecMPM(list->tail, elem);
     return list;
 }
 
-static tListMP deletefirst(tListMP first)
+static tListMPM deletefirstM(tListMPM first)
 {
-    tListMP aux = first->tail;
+    tListMPM aux = first->tail;
     free(first->head.title);
     free(first);
     return aux;
 }
 
-
-void MP(imdbADT imdb, tNode newNode, int startYear, int endYear){ //meto int * controlflag?
+void MPM(imdbADT imdb, tNode newNode, unsigned int startYear)
+{ //meto int * controlflag?
     if (newNode.votes < MINVOTES)
         return;
 
-    if (endYear == -1) {//si es una pelicula todo ESTO LO HAGO FUNCION O LO DEJO ASI?
-        if (imdb->MPData.movieSize == MP_MAX && ( (imdb->MPData.movieFirst->head.rating > newNode.rating) || ((imdb->MPData.movieFirst->head.rating == newNode.rating) && imdb->MPData.movieFirst->head.votes >= newNode.votes)) )
-            return;
+    if (imdb->MPData.movieSize == MP_MAX && ((imdb->MPData.movieFirst->head.rating > newNode.rating) || ((imdb->MPData.movieFirst->head.rating == newNode.rating) && imdb->MPData.movieFirst->head.votes >= newNode.votes)))
+        return;
+
+    tNodeMPM newNodeMPM;
+    newNodeMPM.head.votes = newNode.votes;
+    newNodeMPM.head.rating = newNode.rating;
+    newNodeMPM.head.startYear = startYear;
+    newNodeMPM.head.title = copy(newNode.title /*, controlFlag*/);
+
+    if (imdb->MPData.movieSize == MP_MAX)
+        imdb->MPData.movieFirst = deletefirstM(imdb->MPData.movieFirst);
+    else
+        imdb->MPData.movieSize++;
+    imdb->MPData.movieFirst = addRecMPM(imdb->MPData.movieFirst, newNodeMPM.head /*, controlFlag*/);
+}
+
+//las 3 funciones de abajo son de la query 5
+static tListMPS addRecMPS(tListMPS list, tElemMPS elem /*, int * controlFlag*/) //va a estar ordenada de men a may rating
+{
+    if (list == NULL || list->head.rating > elem.rating || ((list->head.rating == elem.rating) && (elem.votes <= list->head.votes)))
+    {
+        tListMPS newnode = malloc(sizeof(tNodeMPS));
+        /**controlFlag=checkNULL(newnode);
+        if(*controlFlag==ERROR_CODE)
+            return NULL;*/
+        newnode->head = elem;
+        newnode->tail = list;
+        return newnode;
     }
-    else{ //si es una serie
-        if (imdb->MPData.seriesSize == MP_MAX && ( (imdb->MPData.seriesFirst->head.rating > newNode.rating) || ((imdb->MPData.seriesFirst->head.rating == newNode.rating) && imdb->MPData.seriesFirst->head.votes >= newNode.votes)) )
-            return;
-    }
-    tNodeMP newNodeMP;
-    newNodeMP.head.votes = newNode.votes;
-    newNodeMP.head.rating = newNode.rating;
-    newNodeMP.head.startYear = startYear;
-    newNodeMP.head.endYear = endYear;
-    newNodeMP.head.title = copy(newNode.title/*, controlFlag*/);
-    if (endYear == -1){ //si es movie todo LO HAGO FUNCION O LO DEJO
-        if ( imdb->MPData.movieSize == MP_MAX)
-            imdb->MPData.movieFirst = deletefirst(imdb->MPData.movieFirst);
-        else
-            imdb->MPData.movieSize++;
-        imdb->MPData.movieFirst = addRecMP(imdb->MPData.movieFirst, newNodeMP.head/*, controlFlag*/);
-    }
-    else{ //si es serie todo fijarse que cumpla el rango
-        if ( imdb->MPData.seriesSize == MP_MAX)
-            imdb->MPData.seriesFirst = deletefirst(imdb->MPData.seriesFirst);
-        else
-            imdb->MPData.seriesSize++;
-        imdb->MPData.seriesFirst = addRecMP(imdb->MPData.seriesFirst, newNodeMP.head/*, controlFlag*/);
-    }
+    list->tail = addRecMPS(list->tail, elem);
+    return list;
+}
+
+static tListMPS deletefirstS(tListMPS first)
+{
+    tListMPS aux = first->tail;
+    free(first->head.title);
+    free(first);
+    return aux;
+}
+
+void MPS(imdbADT imdb, tNode newNode, unsigned int startYear, unsigned int endYear)
+{
+    if (newNode.votes < MINVOTES)
+        return;
+
+    if (imdb->limitedYear.seriesSize == MP_MAX && ((imdb->limitedYear.seriesFirst->head.rating > newNode.rating) || ((imdb->limitedYear.seriesFirst->head.rating == newNode.rating) && imdb->limitedYear.seriesFirst->head.votes >= newNode.votes)))
+        return;
+
+    tNodeMPS newNodeMPS;
+    newNodeMPS.head.votes = newNode.votes;
+    newNodeMPS.head.rating = newNode.rating;
+    newNodeMPS.head.startYear = startYear;
+    newNodeMPS.head.endYear = endYear;
+    newNodeMPS.head.title = copy(newNode.title /*, controlFlag*/);
+
+    if (imdb->limitedYear.seriesSize == MP_MAX)
+        imdb->limitedYear.seriesFirst = deletefirstS(imdb->limitedYear.seriesFirst);
+    else
+        imdb->limitedYear.seriesSize++;
+    imdb->limitedYear.seriesFirst = addRecMPS(imdb->limitedYear.seriesFirst, newNodeMPS.head /*, controlFlag*/);
 }
 
 static tNode addType(tNode first, tNode node /*int * controlFlag*/)
 {
-    if (node.votes > first.votes) {
+    if (node.votes > first.votes)
+    {
         free(first.title);
         //TODO CAMBIAR FLAG A ADDED
         return node; //cambio el nodo, lo supero en votos
@@ -225,26 +300,30 @@ static tNode addType(tNode first, tNode node /*int * controlFlag*/)
     return first; //no lo supero en votos, devuelvo el que ya estaba
 }
 
-static tListYear addRec(tListYear first, unsigned int year, char *type, tNode node, char ** genres, int dim)
+static tListYear addRec(tListYear first, unsigned int year, char *type, tNode node, char **genres, int dim)
 {
     if (first == NULL || year > first->year)
     {
         tListYear newYear = calloc(1, sizeof(tNodeYear));
         //TODO check ERROR
 
-        if(!strcmp(type, "movie")) {
+        if (!strcmp(type, TYPEMOVIE))
+        {
             newYear->mostVotedMovie = node;
             newYear->numMovies++;
-            for (int i = 0; i < dim; i++) {
+            for (int i = 0; i < dim; i++)
+            {
                 newYear->firstGenre = addRecGenre(newYear->firstGenre, genres[i]);
                 //todo check ERROR
             }
         }
-        else if(!strcmp(type, "tvSeries")) {
+        else if (!strcmp(type, TYPESERIES))
+        {
             newYear->mostVotedSeries = node;
             newYear->numSeries++;
         }
-        else {
+        else
+        {
             free(newYear);
             //TODO CAMBIAR FLAG A NOT ADDED
             return NULL;
@@ -256,16 +335,19 @@ static tListYear addRec(tListYear first, unsigned int year, char *type, tNode no
     }
     if (year == first->year)
     {
-        if (strcmp(type, "movie") == 0){ // se agrega una pelicula
+        if (strcmp(type, TYPEMOVIE) == 0)
+        { // se agrega una pelicula
             first->numMovies++;
-            for (int i = 0; i < dim; ++i) {
+            for (int i = 0; i < dim; ++i)
+            {
                 first->firstGenre = addRecGenre(first->firstGenre, genres[i]);
                 //todo check ERROR
             }
             first->mostVotedMovie = addType(first->mostVotedMovie, node);
             //todo check ERROR
         }
-        else if (strcmp(type,"tvSeries") == 0){ // se agrega una serie
+        else if (strcmp(type, TYPESERIES) == 0)
+        { // se agrega una serie
             first->mostVotedSeries = addType(first->mostVotedSeries, node);
             first->numSeries++;
         }
@@ -276,26 +358,32 @@ static tListYear addRec(tListYear first, unsigned int year, char *type, tNode no
 }
 
 // donde dim es la dimension del vector de generos
-void add(imdbADT imdb,char *type, char *title, char **genres, int dim, float rating, size_t votes, unsigned int startYear, unsigned int endYear)
+void add(imdbADT imdb, char *type, char *title, char **genres, int dim, float rating, size_t votes, unsigned int startYear, unsigned int endYear)
 {
     tNode newNode;
-    newNode.votes=votes;
-    newNode.rating=rating;
-    newNode.title=copy(title);
-    imdb->first=addRec(imdb->first, startYear, type, newNode, genres, dim);
-    //todo add Q4
-    if(!strcmp(type,"tvSeries") && ((imdb->limitedYear.minYear==NO_RESTRICTION || startYear > imdb->limitedYear.minYear) && (imdb->limitedYear.maxYear==NO_RESTRICTION || startYear < imdb->limitedYear.maxYear))){
-        for (int i = 0; i < dim; ++i) {
-            imdb->limitedYear.firstGenreRating=addRecGenreRating(imdb->limitedYear.firstGenreRating, genres[i], rating);
+    newNode.votes = votes;
+    newNode.rating = rating;
+    newNode.title = copy(title);
+    imdb->first = addRec(imdb->first, startYear, type, newNode, genres, dim);
+    if (!strcmp(type, TYPEMOVIE))
+    {
+        MPM(imdb, newNode, startYear);
+    }
+    if (!strcmp(type, TYPESERIES) && ((imdb->limitedYear.minYear == NO_RESTRICTION || startYear >= imdb->limitedYear.minYear) && (imdb->limitedYear.maxYear == NO_RESTRICTION || startYear <= imdb->limitedYear.maxYear)))
+    {
+        for (int i = 0; i < dim; ++i)
+        {
+            imdb->limitedYear.firstGenreRating = addRecGenreRating(imdb->limitedYear.firstGenreRating, genres[i], rating);
         }
-        //todo add Q5
+        MPS(imdb, newNode, startYear, endYear);
     }
 }
 
 //HACER FUNCION RECIEVE YEARS Q5 Y Q6 related function
-void receiveYears(imdbADT imdb, int startYear, int endYear){
-    imdb->limitedYear.minYear=startYear;
-    imdb->limitedYear.maxYear=endYear;
+void receiveYears(imdbADT imdb, int startYear, int endYear)
+{
+    imdb->limitedYear.minYear = startYear;
+    imdb->limitedYear.maxYear = endYear;
 }
 
 void toBegin(imdbADT imdb)
@@ -308,71 +396,302 @@ int hasNext(imdbADT imdb)
     return imdb->currentYear != NULL;
 }
 
-static tListYear next(imdbADT imdb)
+int next(imdbADT imdb)
 {
-    tListYear toReturn = imdb->currentYear;
-    imdb->currentYear = imdb->currentYear->tail;
-    return toReturn;
+    if (!hasNext(imdb))
+        //todo tema errores
+        imdb->currentYear = imdb->currentYear->tail;
+    return OK;
 }
 
-static tListYear searchYear(tListYear first, int year){
-    if (first == NULL || first->year>year)
+static tListYear searchYear(tListYear first, int year)
+{
+    if (first == NULL || first->year > year)
         return NULL;
-    if (first->year== year)
+    if (first->year == year)
         return first;
     return searchYear(first->tail, year);
 }
 
-void toBeginGenre(imdbADT imdb, int year){
-    tListYear aux=searchYear(imdb->first, year);
-    if(aux!=NULL){
-        imdb->currentGenre=aux->firstGenre;
+void toBeginGenre(imdbADT imdb, unsigned int year)
+{
+    tListYear aux = searchYear(imdb->first, year);
+    if (aux != NULL)
+    {
+        imdb->currentGenre = aux->firstGenre;
     }
+    else
+        imdb->currentGenre = NULL;
 }
 
-int hasNextGenre(imdbADT imdb){
+int hasNextGenre(imdbADT imdb)
+{
     return imdb->currentGenre != NULL;
 }
 
-static tListGenre nextGenre(imdbADT imdb)
+int nextGenre(imdbADT imdb)
 {
-    tListGenre toReturn = imdb->currentGenre;
-    imdb->currentGenre = imdb->currentGenre->tail;
-    return toReturn;
+    if (!hasNextGenre(imdb))
+        //todo tema errores
+        imdb->currentGenre = imdb->currentGenre->tail;
+    return OK;
 }
 
-unsigned int getYear(imdbADT imdb){
-    tListYear aux=next(imdb);
-    return aux->year;
+unsigned int getYear(imdbADT imdb)
+{
+    if (imdb->currentYear == NULL)
+        //todo tema errores
+        return imdb->currentYear->year;
 }
 
-char * getGenre(imdbADT imdb, unsigned int * cant){
-    tListGenre aux=nextGenre(imdb);
-    char * string=copy(aux->genre);
-    *cant=aux->cantMovies;
-    return string;
+char *getGenre(imdbADT imdb)
+{
+    if (imdb->currentGenre == NULL)
+        return NULL;
+    char *genre = copy(imdb->currentGenre->genre);
+    if (genre == NULL)
+    { //todo ver el tema errores erno
+
+        return NULL;
+    }
+    return genre;
 }
 
-
-void toBeginLimitedGenres(imdbADT imdb){
-    imdb->limitedYear.currentGenre= imdb->limitedYear.firstGenreRating;
+unsigned int getGenreCant(imdbADT imdb)
+{
+    if (imdb->currentGenre == NULL)
+        //todo errores
+        return imdb->currentGenre->cantMovies;
 }
 
-int hasNextLimitedGenres(imdbADT imdb){
-    return imdb->limitedYear.currentGenre!=NULL;
+void toBeginLimitedGenres(imdbADT imdb)
+{
+    imdb->limitedYear.currentGenre = imdb->limitedYear.firstGenreRating;
 }
 
-static tListGenreRating nextLimitedGenres(imdbADT imdb){
-    tListGenreRating aux=imdb->limitedYear.currentGenre;
-    imdb->limitedYear.currentGenre=imdb->limitedYear.currentGenre->tail;
-    return aux;
+int hasNextLimitedGenres(imdbADT imdb)
+{
+    return imdb->limitedYear.currentGenre != NULL;
 }
 
-char * getLimitedGenre(imdbADT imdb, float * min, float * max){
-    tListGenreRating aux= nextLimitedGenres(imdb);
-    char * string=copy(aux->genre);
-    *min=aux->minRating;
-    *max=aux->maxRating;
-    return string;
+int nextLimitedGenres(imdbADT imdb)
+{
+    if (!hasNextLimitedGenres(imdb))
+        //todo tema errores
+        imdb->limitedYear.currentGenre = imdb->limitedYear.currentGenre->tail;
+    return OK;
 }
 
+char *getLimitedGenre(imdbADT imdb)
+{
+    if (imdb->limitedYear.currentGenre == NULL)
+        return NULL;
+    char *genre = copy(imdb->limitedYear.currentGenre->genre);
+    if (genre == NULL)
+    { //todo ver el tema errores erno
+
+        return NULL;
+    }
+    return genre;
+}
+
+float getLimitedGenreMin(imdbADT imdb)
+{
+    if (imdb->limitedYear.currentGenre == NULL)
+        //todo ver errores
+        return imdb->limitedYear.currentGenre->minRating;
+}
+
+float getLimitedGenreMax(imdbADT imdb)
+{
+    if (imdb->limitedYear.currentGenre == NULL)
+        //todo ver errores
+        return imdb->limitedYear.currentGenre->maxRating;
+}
+
+unsigned int getYearNumMovies(imdbADT imdb)
+{
+    if (imdb->currentYear == NULL)
+        //todo tema errores
+        return imdb->currentYear->numMovies;
+}
+unsigned int getYearNumSeries(imdbADT imdb)
+{
+    if (imdb->currentYear == NULL)
+        //todo tema errores
+        return imdb->currentYear->numSeries;
+}
+
+char *getMostVotedMovieTitle(imdbADT imdb)
+{
+    if (imdb->currentYear == NULL)
+    {
+        //todo tema errores
+    }
+    char *title = copy(imdb->currentYear->mostVotedMovie.title);
+    if (title == NULL)
+    { //todo ver el tema errores ERNO
+
+        return NULL;
+    }
+    return title;
+}
+
+float getMostVotedMovieRating(imdbADT imdb)
+{
+    if (imdb->currentYear == NULL)
+    {
+        //todo tema errores
+    }
+    return imdb->currentYear->mostVotedMovie.rating;
+}
+size_t getMostVotedMovieVotes(imdbADT imdb)
+{
+    if (imdb->currentYear == NULL)
+    {
+        //todo tema errores
+    }
+    return imdb->currentYear->mostVotedMovie.votes;
+}
+
+char *getMostVotedSeriesTitle(imdbADT imdb)
+{
+    if (imdb->currentYear == NULL)
+    {
+        //todo tema errores
+    }
+    char *title = copy(imdb->currentYear->mostVotedSeries.title);
+    if (title == NULL)
+    { //todo ver el tema errores ERNO
+
+        return NULL;
+    }
+    return title;
+}
+
+float getMostVotedSeriesRating(imdbADT imdb)
+{
+    if (imdb->currentYear == NULL)
+    {
+        //todo tema errores
+    }
+    return imdb->currentYear->mostVotedSeries.rating;
+}
+
+size_t getMostVotedSeriesVotes(imdbADT imdb)
+{
+    if (imdb->currentYear == NULL)
+    {
+        //todo tema errores
+    }
+    return imdb->currentYear->mostVotedSeries.votes;
+}
+
+static void freeRecGenre(tListGenre genre)
+{
+    if (genre == NULL)
+        return;
+    freeRecGenre(genre->tail);
+    free(genre->genre);
+    free(genre);
+}
+
+static void freeRecYear(tListYear year)
+{
+    if (year == NULL)
+        return;
+    freeRecYear(year->tail);
+    freeRecGenre(year->firstGenre);
+    free(year->mostVotedSeries.title);
+    free(year->mostVotedMovie.title);
+}
+
+static void freeMP(tListMPM mostPopular)
+{
+    if (mostPopular == NULL)
+        return;
+}
+
+void freeIMDB(imdbADT imdb)
+{
+    freeRecYear(imdb->first);
+    freeMP(imdb->MPData.movieFirst);
+}
+
+/*
+typedef struct tNodeGenreRating{
+    char * genre;
+    float minRating;
+    float maxRating;
+    struct tNodeGenreRating * tail;
+}tNodeGenreRating;
+
+typedef struct tNodeLimitedYear{
+    int minYear;
+    int maxYear;
+    tListGenreRating firstGenreRating;
+    tListGenreRating currentGenre;
+    unsigned int seriesSize;
+    tListMPS seriesFirst;
+}tNodeLimitedYear;
+
+typedef struct tNodeGenre{
+    char * genre;
+    unsigned int cantMovies;
+    struct tNodeGenre * tail;
+}tNodeGenre;
+
+typedef struct tNode{
+    char *title;
+    float rating;
+    size_t votes;
+}tNode;
+
+typedef struct tNodeYear{
+    unsigned int year;
+    unsigned int numMovies;
+    unsigned int numSeries;
+    tListYear tail;
+    tNode mostVotedSeries;
+    tNode mostVotedMovie;
+    tListGenre firstGenre;
+}tNodeYear;
+
+typedef struct tElemMPM{
+    char *title;
+    unsigned int startYear;
+    float rating;
+    unsigned long votes;
+}tElemMPM;
+
+typedef struct tNodeMPM{
+    tElemMPM head;
+    tListMPM tail;
+}tNodeMPM;
+
+typedef struct tElemMPS{
+    char *title;
+    unsigned startYear;
+    unsigned endYear;
+    float rating;
+    unsigned long votes;
+}tElemMPS;
+
+typedef struct tNodeMPS{
+    tElemMPS head;
+    tListMPS tail;
+}tNodeMPS;
+
+typedef struct tMPData{
+    unsigned int movieSize;
+    tListMPM movieFirst;
+}tMPData;
+
+typedef struct imdbCDT{
+    tListYear first;
+    tListYear currentYear;
+    tMPData MPData;
+    tNodeLimitedYear limitedYear;
+    tListGenre currentGenre;
+} imdbCDT;
+ */
