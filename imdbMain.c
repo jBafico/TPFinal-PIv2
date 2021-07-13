@@ -10,6 +10,8 @@
 #define FIRSTYEARPOSITION 2
 #define SECONDYEARPOSITION 3
 
+enum fileposition {Q1=0,Q2,Q3,Q4, Q5, Q6};
+
 #define BLOCK 30
 
 #define GENRE_LIM ","
@@ -22,21 +24,28 @@
 #define FIFTHQUERY "query5.csv"
 #define SIXTHQUERY "query6.csv"
 
-enum data {TITLE,STARTING_YEAR,ENDING_YEAR,GENRES,RATING,VOTES};
+enum data {TYPE,TITLE,STARTING_YEAR,ENDING_YEAR,GENRES,RATING,VOTES};
 
-void noMemoryAbort(void);
+void noMemoryAbort(imdbADT imdb);
 int checkarg(int argc,char *argv[],int *year1,int *year2);
 char *getLineNoLimitFile(FILE *arch);
 void checkopen(FILE **filevec,int queryamount);
 char ** copyGenres(char * genresToDivide, unsigned int * dim);
-void freeGenres(char **genres, unsigned int dim);
+void query1(FILE *arch, imdbADT imdb, unsigned int year);
+void query2(FILE * arch, imdbADT imdb, unsigned int year);
+void query3(FILE *arch, imdbADT imdb, unsigned int year);
+void query6(FILE* arch, imdbADT imdb);
+void skipline(FILE *arch);
 
 
 int main(int argc,char *argv[])
 {
     int year1,year2;
-    if (!checkarg(argc,argv,&year1,&year2))
+    // mesaje a salida de error?
+    if (!checkarg(argc,argv,&year1,&year2)){
+        //todo hacer mesg de error
         return 1;
+    }
 
     FILE *arch;
     arch = fopen(argv[1],"r");
@@ -46,21 +55,26 @@ int main(int argc,char *argv[])
         fprintf(stderr,"No se pudo abrir el archivo");
         exit(1);
     }
+    skipline(arch);
     imdbADT imdb = new();
-    //TODO VALIDAR IMDB CON NULL O USAR ERRNO
-
+    //TODO VALIDAR IMDB CON NULL Y USAR ERRNO (imdb == NULL || errno == ENOMEM)
+    //todo guardar los años potentes en el struct
     char * line;
+    //  desconozco si es mas eficiente tener las variables afuera,
+    // pero me hace rudio que se declaremos en todos los ciclos
     while ((line = getLineNoLimitFile(arch)) != NULL) {
         unsigned int startingYear,endingYear, dim=0;
         size_t votes;
         float rating;
-        char * title;
+        char * title, * type;
         char ** genres;
         char *token = strtok(line, VARIABLE_LIM);
-        char *type = token;
         // Solo leemos datos hasta los votos, salteamos runtimeMinutes
-        for (int i = 0; i <= VOTES; i++) {
+        for (int i = 0; i <= VOTES; i++, token=strtok(NULL, VARIABLE_LIM)) {
             switch (i) {
+                case TYPE:
+                    type=token;
+                    break;
                 case TITLE:
                     title = token;
                     break;
@@ -80,17 +94,13 @@ int main(int argc,char *argv[])
                     votes = atoi(token);
                     break;
             }
-            token = strtok(NULL, ";");
         }
-        free(line);
-        if(startingYear > 0) {
+        if(startingYear > 0) { //Porque si el atoi encuentra un "\N" en el .csv le va a asignar un 0 a startingYear
             add(imdb, type, title, genres, dim, rating, votes, startingYear, endingYear);
         }
-        free(title);
-        freeGenres(genres,dim);
-        // liberar el vector
+        free(line);
+        free(genres);
     }
-
     // inicializo los archivos
     FILE *q1 = fopen(FIRSTQUERY,"w");
     FILE *q2 = fopen(SECONDQUERY,"w");
@@ -101,53 +111,77 @@ int main(int argc,char *argv[])
     FILE *filevec[] = {q1,q2,q3,q4,q5,q6};
     checkopen(filevec,QUERY_AMOUNT);
     // codigo para correr las 6 queries,
-
-}
-
-void query1(FILE *arch, imdbADT imdb)
-{
-    fprintf(arch, "year;films;series\n");
     toBegin(imdb);
-    tListYear aux;
-
-    while (hasNext(imdb))
-    {
-        aux = next(imdb);
-        fprintf(arch, "%u;%u;%u\n", aux->year, aux->numMovies, aux->numSeries);
-    }
-    fclose(arch);
-}
-
-void query2(FILE * arch, imdbADT imdb) {
-    toBegin(imdb);
-    fprintf(arch, "%s;%s;%s\n", "year", "genre", "films");
-    unsigned int year, cantMovies;
-    while (hasNext(imdb)) {
+    fprintf(filevec[Q1], "year;films;series\n");
+    fprintf(filevec[Q2], "%s;%s;%s\n", "year", "genre", "films");
+    fprintf(filevec[Q3], "startYear;film;votesFilm;ratingFilm;serie;votesSerie;ratingSerie\n");
+    unsigned int year; //declaramos year para usar dentro del while
+    while(hasNext(imdb)){
         year=getYear(imdb);
-        while(hasNextGenre(imdb)){
-            char * genre=getGenre(imdb, &cantMovies);
-            fprintf(arch, "%d;%s;%d\n", year, genre, cantMovies);
-            free(genre);
-        }
-
+        query1(filevec[Q1], imdb, year);
+        query2(filevec[Q2], imdb, year);
+        query3(filevec[Q3], imdb, year);
+        next(imdb);
     }
-    fclose(arch);
+    query6(filevec[Q6], imdb);
+    //todo cerrar las Q1 Q2 Q3 Q4 Q5 Q6
 }
 
-void query3(FILE *arch, imdbADT imdb){
-    fprintf(arch, "startYear;film;votesFilm;ratingFilm;serie;votesSerie;ratingSerie\n");
-    toBegin(imdb);
-    tListYear aux;
-    while(hasNext(imdb)) {
-        aux=next(imdb);
-        if(aux->numMovies == 0)
-            fprintf(arch, "%u; ; ; ;%s;%lu;%.1f\n", aux->year, aux->mostVotedSeries.title, aux->mostVotedSeries.votes, aux->mostVotedSeries.rating);
-        else if(aux->numSeries == 0)
-            fprintf(arch, "%u;%s;%lu;%.1f; ; ; \n", aux->year, aux->mostVotedMovie.title, aux->mostVotedMovie.votes, aux->mostVotedMovie.rating);
-        else
-            fprintf(arch, "%u;%s;%lu;%.1f;%s;%lu;%.1f\n", aux->year, aux->mostVotedMovie.title, aux->mostVotedMovie.votes, aux->mostVotedMovie.rating, aux->mostVotedSeries.title, aux->mostVotedSeries.votes, aux->mostVotedSeries.rating);
+void skipline(FILE *arch)
+{
+    while( fgetc(arch) != '\n' )
+        ;
+}
+
+void query1(FILE *arch, imdbADT imdb, unsigned int year)
+{
+    unsigned int numMovies, numSeries;
+    numMovies= getYearNumMovies(imdb);
+    numSeries= getYearNumSeries(imdb);
+    fprintf(arch, "%u;%u;%u\n", year, numMovies, numSeries);
+}
+
+void query2(FILE * arch, imdbADT imdb, unsigned int year) {
+    toBeginGenre(imdb, year);
+    unsigned int cantMovies;
+    while(hasNextGenre(imdb)){
+        char * genre=getGenre(imdb);
+        cantMovies= getGenreCant(imdb);
+        fprintf(arch, "%d;%s;%d\n", year, genre, cantMovies);
+        free(genre);
+        nextGenre(imdb);
     }
-    fclose(arch);
+}
+
+void query3(FILE *arch, imdbADT imdb, unsigned int year){
+    unsigned int numMovies, numSeries;
+    numMovies= getYearNumMovies(imdb);
+    numSeries= getYearNumSeries(imdb);
+    //el llamado a las funciones que vienen ahora esta hecho de esta manera porque si por ejemplo
+    //no existen peliculas en ese año specifico las funciones que agarran los parametros de las
+    //peliculas estarian accediendo a NULL. Al hacerlo de la forma que nosotros implementamos
+    //esas situaciones no se presentan.
+    if(numMovies == 0) {
+        char * serieTitle= getMostVotedSeriesTitle(imdb);
+        size_t serieVotes= getMostVotedSeriesVotes(imdb);
+        float serieRating= getMostVotedSeriesRating(imdb);
+        fprintf(arch, "%u; ; ; ;%s;%lu;%.1f\n", year, serieTitle, serieVotes, serieRating);
+    }
+    else if(numSeries == 0) {
+        char * movieTitle= getMostVotedMovieTitle(imdb);
+        size_t movieVotes= getMostVotedMovieVotes(imdb);
+        float movieRating= getMostVotedMovieRating(imdb);
+        fprintf(arch, "%u;%s;%lu;%.1f; ; ; \n", year, movieTitle, movieVotes, movieRating);
+    }
+    else {
+        char * serieTitle= getMostVotedSeriesTitle(imdb);
+        size_t serieVotes= getMostVotedSeriesVotes(imdb);
+        float serieRating= getMostVotedSeriesRating(imdb);
+        char * movieTitle= getMostVotedMovieTitle(imdb);
+        size_t movieVotes= getMostVotedMovieVotes(imdb);
+        float movieRating= getMostVotedMovieRating(imdb);
+        fprintf(arch, "%u;%s;%lu;%.1f;%s;%lu;%.1f\n", year, movieTitle, movieVotes, movieRating, serieTitle, serieVotes, serieRating);
+    }
 }
 
 void query4(FILE* out,imdbADT imdb)
@@ -158,7 +192,7 @@ void query4(FILE* out,imdbADT imdb)
      * if ( list == NULL)
         return;
     printAndFreeMPrec(list->tail,out);
-    fprintf(out,"%d,%s,%lu,%.1f\n",list->head.year,list->head.title,list->head.votes,list->head.rating);
+    fprintf(out,"%d;%s;%lu;%.1f\n",list->head.year,list->head.title,list->head.votes,list->head.rating);
      */
     fclose(out);
 }
@@ -168,21 +202,21 @@ void query6(FILE* arch, imdbADT imdb){
     fprintf(arch, "%s;%s;%s\n", "genre", "min", "max");
     float min, max;
     while(hasNextLimitedGenres(imdb)){
-        char * genre=getLimitedGenre(imdb, &min, &max);
-        fprintf(arch, "%s;%.2f;%.2f", genre, min, max);
+        char * genre=getLimitedGenre(imdb);
+        min= getLimitedGenreMin(imdb);
+        max= getLimitedGenreMax(imdb);
+        fprintf(arch, "%s;%.1f;%.1f", genre, min, max);
         free(genre);
+        nextLimitedGenres(imdb);
     }
 }
 
 char ** copyGenres(char * genresToDivide, unsigned int * dim){
     int i = 0;
-    char ** genres;
-    genres = malloc(sizeof(char *));
-    genres[i++] = strtok(genresToDivide,GENRE_LIM);
-    for(; genresToDivide != NULL; i++) {
-        genres= realloc(genres, sizeof(char *) * (i+1));
-        genres[i] = genresToDivide;
-        genresToDivide = strtok(NULL, GENRE_LIM);
+    char ** genres = NULL;
+    for(char * aux = strtok(genresToDivide, GENRE_LIM); aux != NULL; aux = strtok(NULL, GENRE_LIM), i++) {
+        genres = realloc(genres, sizeof(char*)*(i+1));
+        genres[i] = aux;
     }
     *dim = i;
     return genres;
@@ -230,12 +264,13 @@ char *getLineNoLimitFile(FILE *arch)
     return s;
 }
 
-void noMemoryAbort(void)
+// DEBE LIBERAR LA MEMORIA DEL TAD
+void noMemoryAbort(imdbADT imdb)
 {
     fprintf(stderr,"No se ha podido reservar memoria\n");
+    freeIMDB(imdb); //TODO crear funcion free
     exit(1);
 }
-
 
 void checkYearFormat(char *strtocheck,int *errorflag)
 {
@@ -248,7 +283,6 @@ void checkYearFormat(char *strtocheck,int *errorflag)
             return;
         }
     }
-
 }
 
 // ojo esta funcion
@@ -256,14 +290,16 @@ int checkarg(int argc,char *argv[],int *year1,int *year2)
 {
     if ( argc < ARG_AMOUNT || argc > ARGWITHYEAR)
     {
+        // Como maximo 2 anios -> esto deberia ir a salida de error
         printf("Por favor ingrese un unico archivo a procesar y unicamente dos años\n");
         return NOTOK;
     }
     // valido que me hayan pasado años
     int error = 0;
+    //todo ver si cambio esto de arriba
     if ( argc >= FIRSTYEARPOSITION + 1)
     {
-      checkYearFormat(argv[FIRSTYEARPOSITION],&error);
+        checkYearFormat(argv[FIRSTYEARPOSITION],&error);
     }
     if ( argc == SECONDYEARPOSITION + 1 && error != ERROR_CODE) {
         checkYearFormat(argv[SECONDYEARPOSITION],&error);
@@ -289,10 +325,4 @@ int checkarg(int argc,char *argv[],int *year1,int *year2)
     *year1 = firstyear;
     *year2 = secondyear;
     return OK;
-}
-
-void freeGenres(char **genres, unsigned int dim){
-    for (int i = 0; i < dim; i++)
-        free(genres[i]);
-    free(genres);
 }
