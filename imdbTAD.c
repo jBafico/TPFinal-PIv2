@@ -689,7 +689,7 @@ int hasNextTop100Movies(imdbADT imdb)
     return imdb->MPData.veciterativeindex != imdb->MPData.movieSize;
 }
 
-int NextTop100Movies(imdbADT imdb)
+int nextTop100Movies(imdbADT imdb)
 {
     if ( !hasNextTop100Movies(imdb) )
     {
@@ -697,6 +697,26 @@ int NextTop100Movies(imdbADT imdb)
     }
     imdb->MPData.veciterativeindex += 1;
     return OK;
+}
+
+//que lo libere el front
+char * getTop100MovieTitle(imdbADT imdb)
+{
+    char * toreturn = copy(imdb->MPData.vec[imdb->MPData.veciterativeindex]->head.title);
+    return toreturn;
+}
+
+unsigned int getTop100MovieStartYear(imdbADT imdb){
+    return imdb->MPData.vec[imdb->MPData.veciterativeindex]->head.startYear;
+}
+
+
+unsigned int getTop100MovieVotes(imdbADT imdb){
+    return imdb->MPData.vec[imdb->MPData.veciterativeindex]->head.votes;
+}
+
+float getTop100MovieRating(imdbADT imdb){
+    return imdb->MPData.vec[imdb->MPData.veciterativeindex]->head.rating;
 }
 
 static void freeRecGenre(tListGenre genre)
