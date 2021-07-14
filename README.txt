@@ -1,3 +1,10 @@
+Autores:
+- Agustin Zakalik 62068 (TheSpackJarrow)
+- Franco Bosetti 61654 (francobosetti)
+- Juan Cruz Bafico 62070 (jBafico)
+- Santino Augusto Ranucci 62092 (sranucci)
+
+
 Hola buenas, en este .txt se detallaran los pasos a seguir
 para poder generar los ejecutables y luego ejecutarlos
 de la forma correcta. Es de vital importancia que todos
