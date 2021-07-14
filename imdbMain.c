@@ -27,7 +27,7 @@
 
 #define VALIDARGUMENT(x) (((x) >= (ARG_AMOUNT)) && ((x) <= (ARGWITHYEAR)))
 // #define LOADYEAR(argc, argv, year, pos, errId) { if ((argc) == (pos) + 1) { *(year) = atoi((argv)[(pos)]); if (*(year) <= 0) return (errId); } }
-#define LOADYEAR(argc, argv, year, pos, errId) { if ((argc) == (pos) + 1) {         \
+#define LOADYEAR(argc, argv, year, pos, errId) { if ((argc) >= (pos) + 1) {         \
                                                     *(year) = atoi((argv)[(pos)]);  \
                                                     if (*(year) <= 0)               \
                                                         return (errId); }           \
@@ -364,26 +364,25 @@ int checkarg(int argc,char *argv[],int *year1,int *year2){
     if (!VALIDARGUMENT(argc)) {
         return NOTOK;
       }
-
+    /*
       if(argc >= FIRSTYEARPOSITION + 1) {
            *year1 = atoi(argv[FIRSTYEARPOSITION]);
            if (*year1 <= 0) {
                return NOTOK;
            }
-      }
-      //o -> LOADYEAR(argc, argv, year1, FIRSTYEARPOSITION, EYEAR)
-      if(argc == SECONDYEARPOSITION + 1) {
+      }*/
+      LOADYEAR(argc, argv, year1, FIRSTYEARPOSITION, EYEAR)
+      /*if(argc == SECONDYEARPOSITION + 1) {
            *year2 = atoi(argv[SECONDYEARPOSITION]);
            if (*year2 <= 0) {
                return NOTOK;
            }
-      }
-      //o -> LOADYEAR(argc, argv, year2, SECONDYEARPOSITION, EYEAR)
+      }*/
+        LOADYEAR(argc, argv, year2, SECONDYEARPOSITION, EYEAR)
       if (argc == ARGWITHYEAR && *year1 > *year2) {
            return NOTOK;
       }
      return OK;
-
 }
 
 void errorMessage(const char * errMessage, int exitValue) {

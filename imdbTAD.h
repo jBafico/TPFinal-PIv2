@@ -4,7 +4,8 @@
 #define OK 1
 #define NOTOK !OK
 #define ERROR_CODE (-1)
-#define NO_RESTRICTION (-1)
+// R: dejar en mayor o igual a cero!!!!! ( usamos unsigned int)
+#define NO_RESTRICTION (0)
 #define TYPESERIES "tvSeries"
 #define TYPEMOVIE "movie"
 #define EPOS (-2)
