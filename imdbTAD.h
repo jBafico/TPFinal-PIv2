@@ -121,4 +121,13 @@ int getsizeTop100Series(imdbADT imdb);
  */
 int getDataFromPositionOfTop100Series(imdbADT imdb, int position, unsigned int *startYear, unsigned int *endYear, float *rating, unsigned int * cantVotes, char **title);
 
+/*
+ * actualiza los datos del Top 100 Movies en caso de que se hayan cargado nuevos datos
+ */
+void prepareTop100Movies(imdbADT imdb);
+
+int getsizeTop100Movies(imdbADT imdb);
+
+void getDataFromPositionOfTop100Movies(imdbADT imdb,int position,char **title,unsigned int *startyear,float *rating,unsigned int *votes);
+
 #endif //TPFINAL2_IMDBTAD_H

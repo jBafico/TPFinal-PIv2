@@ -44,6 +44,8 @@ char ** copyGenres(char * genresToDivide, unsigned int * dim);
 int query1(FILE *arch, imdbADT imdb, unsigned int year);
 int query2(FILE * arch, imdbADT imdb, unsigned int year);
 int query3(FILE *arch, imdbADT imdb, unsigned int year);
+void query4(FILE *arch, imdbADT imdb);
+void query5(FILE *arch,imdbADT imdb);
 int query6(FILE* arch, imdbADT imdb);
 void closeFiles(FILE **filevec,int queryAmount);
 void skipline(FILE *arch);
@@ -53,7 +55,7 @@ void errorAbort(imdbADT imdb, FILE * fileVec[], const char * errMessage, int exi
 
 int main(int argc,char *argv[])
 {
-    int year1,year2;
+    int year1 = NO_RESTRICTION,year2 = NO_RESTRICTION;
     if (!checkarg(argc,argv,&year1,&year2)){
         errorMessage("Argumentos invalidos", ERROR_CODE);
     }
@@ -150,7 +152,8 @@ int main(int argc,char *argv[])
     }
     if(!query6(filevec[Q6], imdb))
         errorAbort(imdb, filevec, "Hubo un error en el uso de iteradores dentro de la Q6", errno);
-
+    query4(filevec[Q4],imdb);
+    query5(filevec[Q5],imdb);
     closeFiles(filevec, CANT_FILES);
     freeIMDB(imdb);
     return 0;
@@ -161,6 +164,39 @@ void skipline(FILE *arch)
     while( fgetc(arch) != '\n' )
         ;
 }
+
+void query4(FILE *arch, imdbADT imdb)
+{
+    prepareTop100Movies(imdb);
+    int size = getsizeTop100Movies(imdb);
+    fprintf(arch, "startyear;primaryTitle;numVotes;averageRating\n");
+    for ( int i = 1; i <= size; i++)
+    {
+        unsigned int startyear, cantvotes;
+        float rating;
+        char * string;
+        getDataFromPositionOfTop100Movies(imdb, i, &string, &startyear, &rating, &cantvotes);
+        fprintf(arch, "%u;%s;%u;%.1f\n", startyear, string, cantvotes, rating);
+        free(string);
+    }
+}
+
+void query5(FILE *arch,imdbADT imdb)
+{
+    prepareTop100Series(imdb);
+    int size = getsizeTop100Series(imdb);
+    fprintf(arch,"startYear;endYear;primaryTitle;numVotes;averageRating\n");
+    for ( int i = 1; i <= size;i++)
+    {
+        unsigned int startyear, endyear, cantvotes;
+        float rating;
+        char *string;
+        getDataFromPositionOfTop100Series(imdb,i,&startyear,&endyear,&rating,&cantvotes,&string);
+        fprintf(arch,"%u;%u;%s;%u;%.1f\n",startyear,endyear,string,cantvotes,rating);
+        free(string);
+    }
+}
+
 
 int query1(FILE *arch, imdbADT imdb, unsigned int year)
 {
@@ -235,18 +271,6 @@ int query3(FILE *arch, imdbADT imdb, unsigned int year){
     return OK;
 }
 
-int query4(FILE* out,imdbADT imdb)
-{
-    fprintf(out,"startYear;primaryTitle;numVotes;averageRating\n");
-    //printAndFreeMPrec(imdb->mostPopularData.first,out);
-    /* ESTO ES EL CÓDIGO DE LA FUNCION DE ARRIBA
-     * if ( list == NULL)
-        return;
-    printAndFreeMPrec(list->tail,out);
-    fprintf(out,"%d;%s;%lu;%.1f\n",list->head.year,list->head.title,list->head.votes,list->head.rating);
-     */
-    fclose(out);
-}
 
 int query6(FILE* arch, imdbADT imdb){
     toBeginLimitedGenres(imdb);
@@ -336,11 +360,12 @@ void checkYearFormat(char *strtocheck,int *errorflag){
 
 // ojo esta funcion
 int checkarg(int argc,char *argv[],int *year1,int *year2){
+
     if (!VALIDARGUMENT(argc)) {
-           return NOTOK;
+        return NOTOK;
       }
 
-      if(argc == FIRSTYEARPOSITION + 1) {
+      if(argc >= FIRSTYEARPOSITION + 1) {
            *year1 = atoi(argv[FIRSTYEARPOSITION]);
            if (*year1 <= 0) {
                return NOTOK;
@@ -354,7 +379,7 @@ int checkarg(int argc,char *argv[],int *year1,int *year2){
            }
       }
       //o -> LOADYEAR(argc, argv, year2, SECONDYEARPOSITION, EYEAR)
-      if (argc == ARGWITHYEAR && *year1 < *year2) {
+      if (argc == ARGWITHYEAR && *year1 > *year2) {
            return NOTOK;
       }
      return OK;
