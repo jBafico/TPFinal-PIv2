@@ -25,7 +25,7 @@
 #define FIFTHQUERY "query5.csv"
 #define SIXTHQUERY "query6.csv"
 
-#define VALID_ARG(x) (((x) >= (ARG_AMOUNT)) && ((x) <= (ARGWITHYEAR)))
+#define VALIDARGUMENT(x) (((x) >= (ARG_AMOUNT)) && ((x) <= (ARGWITHYEAR)))
 // #define LOADYEAR(argc, argv, year, pos, errId) { if ((argc) == (pos) + 1) { *(year) = atoi((argv)[(pos)]); if (*(year) <= 0) return (errId); } }
 #define LOADYEAR(argc, argv, year, pos, errId) { if ((argc) == (pos) + 1) {         \
                                                     *(year) = atoi((argv)[(pos)]);  \
@@ -47,7 +47,7 @@ int query3(FILE *arch, imdbADT imdb, unsigned int year);
 int query6(FILE* arch, imdbADT imdb);
 void closeFiles(FILE **filevec,int queryAmount);
 void skipline(FILE *arch);
-void errMessage(const char * errMessage, int exitValue);
+void errorMessage(const char * errMessage, int exitValue);
 void errorAbort(imdbADT imdb, FILE * fileVec[], const char * errMessage, int exitValue);
 
 
@@ -55,7 +55,7 @@ int main(int argc,char *argv[])
 {
     int year1,year2;
     if (!checkarg(argc,argv,&year1,&year2)){
-        errMessage("Argumentos invalidos", ERROR_CODE);
+        errorMessage("Argumentos invalidos", ERROR_CODE);
     }
 
     FILE *arch;
@@ -73,7 +73,7 @@ int main(int argc,char *argv[])
     imdbADT imdb = new();
     if(imdb==NULL || errno == ENOMEM){
         closeFiles(filevec, CANT_FILES);
-        errMessage("No se pude crear el imdb por falta de memoria", errno);
+        errorMessage("No se pude crear el imdb por falta de memoria", errno);
     }
     receiveYears(imdb, year1, year2);
     //todo guardar los años potentes en el struct
@@ -84,7 +84,7 @@ int main(int argc,char *argv[])
         unsigned int startingYear,endingYear, dim=0;
         size_t votes;
         float rating;
-        char * title, * type;
+        char * title, * type, *genresToDivide;
         char ** genres;
         char *token = strtok(line, VARIABLE_LIM);
         // Solo leemos datos hasta los votos, salteamos runtimeMinutes
@@ -103,9 +103,7 @@ int main(int argc,char *argv[])
                     endingYear = atoi(token);
                     break;
                 case GENRES:
-                    genres=copyGenres(token,&dim);
-                    if(genres==NULL || errno ==ENOMEM)
-                        errorAbort(imdb, filevec, "No hay memoria sufiencte", ENOMEM);
+                    genresToDivide=token;
                     break;
                 case RATING:
                     rating = atof(token);
@@ -115,17 +113,21 @@ int main(int argc,char *argv[])
                     break;
             }
         }
+
         if(startingYear > 0) { //Porque si el atoi encuentra un "\N" en el .csv le va a asignar un 0 a startingYear
+            genres=copyGenres(genresToDivide,&dim);
+            if(genres==NULL || errno ==ENOMEM)
+                errorAbort(imdb, filevec, "No hay memoria sufiencte", ENOMEM);
             add(imdb, type, title, genres, dim, rating, votes, startingYear, endingYear);
+            free(genres);
         }
         free(line);
-        free(genres);
         if (errno == ENOMEM) {
             errorAbort(imdb, filevec, "No hay memoria suficiente para guardar mas datos", errno);
         }
     }
 
-    // codigo para correr las 6 queries,
+    // codigo para correr las 6 queries
     toBegin(imdb);
     fprintf(filevec[Q1], "year;films;series\n");
     fprintf(filevec[Q2], "%s;%s;%s\n", "year", "genre", "films");
@@ -150,6 +152,8 @@ int main(int argc,char *argv[])
         errorAbort(imdb, filevec, "Hubo un error en el uso de iteradores dentro de la Q6", errno);
 
     closeFiles(filevec, CANT_FILES);
+    freeIMDB(imdb);
+    return 0;
 }
 
 void skipline(FILE *arch)
@@ -255,7 +259,7 @@ int query6(FILE* arch, imdbADT imdb){
         if(errno==ITERATIVE_ERROR || errno==ENOMEM){
             return NOTOK;
         }
-        fprintf(arch, "%s;%.1f;%.1f", genre, min, max);
+        fprintf(arch, "%s;%.1f;%.1f\n", genre, min, max);
         free(genre);
         nextLimitedGenres(imdb);
         if(errno==ITERATIVE_ERROR){
@@ -279,6 +283,7 @@ char ** copyGenres(char * genresToDivide, unsigned int * dim){
     *dim = i;
     return genres;
 }
+
 void closeFiles(FILE **filevec,int fileAmount){
     for (int i = 0; i < fileAmount; ++i) {
         if(filevec[i]!=NULL)
@@ -331,65 +336,29 @@ void checkYearFormat(char *strtocheck,int *errorflag){
 
 // ojo esta funcion
 int checkarg(int argc,char *argv[],int *year1,int *year2){
-    /* if (!VALIDARGUMENT(argc)) {
-     *      return EARG;
-     * }
-     *
-     * if(argc == FIRSTYEARPOSITION + 1) {
-     *      *year1 = atoi(argv[FIRSTYEARPOSITION]);
-     *      if (*year1 <= 0) {
-     *          return EYEAR;
-     *      }
-     * }
-     * o -> LOADYEAR(argc, argv, year1, FIRSTYEARPOSITION, EYEAR)
-     * if(argc == SECONDYEARPOSITION + 1) {
-     *      *year2 = atoi(argv[SECONDYEARPOSITION]);
-     *      if (*year2 <= 0) {
-     *          return EYEAR;
-     *      }
-     * }
-     * o -> LOADYEAR(argc, argv, year2, SECONDYEARPOSITION, EYEAR)
-     * if (argc == ARGWITHYEAR && *year1 < *year2) {
-     *      return EYEAR;
-     * }
-     * return OK;
-     */
-    if ( argc < ARG_AMOUNT || argc > ARGWITHYEAR){
-        // Como maximo 2 anios -> esto deberia ir a salida de error
-        printf("Por favor ingrese un unico archivo a procesar y unicamente dos años\n");
-        return NOTOK;
-    }
-    // valido que me hayan pasado años
-    int error = 0;
-    //todo ver si cambio esto de arriba
-    if ( argc >= FIRSTYEARPOSITION + 1){
-        checkYearFormat(argv[FIRSTYEARPOSITION],&error);
-    }
-    if ( argc == SECONDYEARPOSITION + 1 && error != ERROR_CODE) {
-        checkYearFormat(argv[SECONDYEARPOSITION],&error);
-    }
-    if ( error == ERROR_CODE ) {
-        printf("por favor, ingrese años validos\n");
-        return NOTOK;
-    }
-    int firstyear,secondyear;
-    if ( argc >= FIRSTYEARPOSITION + 1)
-        sscanf(argv[FIRSTYEARPOSITION],"%d",&firstyear);
-    else
-        firstyear = NO_RESTRICTION;
-    if ( argc == SECONDYEARPOSITION + 1)
-        sscanf(argv[SECONDYEARPOSITION],"%d",&secondyear);
-    else
-        secondyear = NO_RESTRICTION;
-    if (firstyear != NO_RESTRICTION && secondyear != NO_RESTRICTION && secondyear < firstyear ) {
-        printf("el año ingresado es incorrecto\n");
-        return NOTOK;
-    }
+    if (!VALIDARGUMENT(argc)) {
+           return NOTOK;
+      }
 
-    // si los años son validos reemplazo
-    *year1 = firstyear;
-    *year2 = secondyear;
-    return OK;
+      if(argc == FIRSTYEARPOSITION + 1) {
+           *year1 = atoi(argv[FIRSTYEARPOSITION]);
+           if (*year1 <= 0) {
+               return NOTOK;
+           }
+      }
+      //o -> LOADYEAR(argc, argv, year1, FIRSTYEARPOSITION, EYEAR)
+      if(argc == SECONDYEARPOSITION + 1) {
+           *year2 = atoi(argv[SECONDYEARPOSITION]);
+           if (*year2 <= 0) {
+               return NOTOK;
+           }
+      }
+      //o -> LOADYEAR(argc, argv, year2, SECONDYEARPOSITION, EYEAR)
+      if (argc == ARGWITHYEAR && *year1 < *year2) {
+           return NOTOK;
+      }
+     return OK;
+
 }
 
 void errorMessage(const char * errMessage, int exitValue) {

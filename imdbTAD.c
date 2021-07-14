@@ -286,13 +286,14 @@ void MPS(imdbADT imdb, tNode newNode, unsigned int startYear, unsigned int endYe
     imdb->limitedYear.seriesFirst = addRecMPS(imdb->limitedYear.seriesFirst, newNodeMPS /*, controlFlag*/);
 }
 
-static tNode addType(tNode first, tNode node /*int * controlFlag*/){
+static tNode addType(tNode first, tNode node){
     if (node.votes > first.votes){
+        node.title= copy(node.title);
         free(first.title);
-        //TODO CAMBIAR FLAG A ADDED
+        if(node.title==NULL || errno == ENOMEM)
+            return first;
         return node; //cambio el nodo, lo supero en votos
     }
-    //todo *controlFlag=NOT_ADDED;
     return first; //no lo supero en votos, devuelvo el que ya estaba
 }
 
@@ -303,11 +304,14 @@ static tListYear addRec(tListYear first, unsigned int year, char *type, tNode no
             errno=ENOMEM;
             return first;
         }
+        node.title= copy(node.title);
+        if(node.title==NULL || errno == ENOMEM)
+            return first;
+
         if (!strcmp(type, TYPEMOVIE)){
             newYear->mostVotedMovie = node;
             newYear->numMovies++;
-            for (int i = 0; i < dim; i++)
-            {
+            for (int i = 0; i < dim; i++){
                 newYear->firstGenre = addRecGenre(newYear->firstGenre, genres[i]);
                 //todo check ERROR
             }
@@ -351,18 +355,16 @@ void add(imdbADT imdb, char *type, char *title, char **genres, int dim, float ra
     tNode newNode;
     newNode.votes = votes;
     newNode.rating = rating;
-    newNode.title = copy(title);
-    if(newNode.title==NULL || errno == ENOMEM)
-        return;//todo checkear si esto te bien
+    newNode.title = title;
+
     imdb->first = addRec(imdb->first, startYear, type, newNode, genres, dim);
     if (!strcmp(type, TYPEMOVIE))
         MPM(imdb, newNode, startYear);
 
     if (!strcmp(type, TYPESERIES) && ((imdb->limitedYear.minYear == NO_RESTRICTION || startYear >= imdb->limitedYear.minYear) && (imdb->limitedYear.maxYear == NO_RESTRICTION || startYear <= imdb->limitedYear.maxYear))){
         for (int i = 0; i < dim; ++i)
-        {
             imdb->limitedYear.firstGenreRating = addRecGenreRating(imdb->limitedYear.firstGenreRating, genres[i], rating);
-        }
+
         MPS(imdb, newNode, startYear, endYear);
     }
 }
@@ -392,7 +394,7 @@ int next(imdbADT imdb){
 }
 
 static tListYear searchYear(tListYear first, unsigned int year){
-    if (first == NULL || first->year > year)
+    if (first == NULL || first->year < year)
         return NULL;
     if (first->year == year)
         return first;
@@ -413,10 +415,9 @@ int hasNextGenre(imdbADT imdb){
 }
 
 int nextGenre(imdbADT imdb){
-    if (!hasNextGenre(imdb)){
-        errno=ITERATIVE_ERROR;
-        return ITERATIVE_ERROR;
-    }
+    if (!hasNextGenre(imdb))
+       return errno=ITERATIVE_ERROR;
+
     imdb->currentGenre = imdb->currentGenre->tail;
     return OK;
 }
@@ -448,7 +449,6 @@ int getGenreCant(imdbADT imdb){
         errno=ITERATIVE_ERROR;
         return ITERATIVE_ERROR;
     }
-
 
     return imdb->currentGenre->cantMovies;
 }

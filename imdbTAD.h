@@ -11,6 +11,8 @@
 #define NOTINITIALIZED (-3)
 
 #define ITERATIVE_ERROR (-2)
+#define EARG (-3)
+#define EYEAR (-5)
 
 #include <stdio.h>
 
@@ -117,9 +119,6 @@ int getsizeTop100Series(imdbADT imdb);
  * en caso de que sea la primera carga  no es necesario llamar a prepareTop100Series, si se hace una carga adicional,
  * es necesario llamar a dicha funcion para * que se actualicen los datos
  */
-int getDataFromPositionOfTop100Series(imdbADT imdb, int position, unsigned int *startYear, unsigned int *endYear, float *rating, unsigned int * cantVotes, char **title)
-
-
+int getDataFromPositionOfTop100Series(imdbADT imdb, int position, unsigned int *startYear, unsigned int *endYear, float *rating, unsigned int * cantVotes, char **title);
 
 #endif //TPFINAL2_IMDBTAD_H
-
