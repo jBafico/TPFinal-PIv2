@@ -27,12 +27,21 @@ terminal lo siguiente: make all
 
 5) Al ya tener el ejecutable imdb, ya puede usarlo
 con su .csv, para eso ingrese lo siguiente a la
-terminal: ./imdb (NOMBRE DEL .csv)
+terminal: ./imdb (NOMBRE DEL .csv) (Año inicial) (Año final)
 Es importante que el .csv ingresado este en el
 mismo directorio que el ejecutable
+Los campos (Año inicial) y (Año final) son restricciones para las Queries 5 y 6
+
+Usted puede:    1-No ingresar años por lo cual no hay restricciones
+                2-Ingresar solo el Año inicial por lo cual hay restricciones
+                  solo para el año inicial pero no final
+                3-Ingresar ambos años por lo cual hay doble restriccion
+
+Si usted decide ingresar cualquier opcion que no fue mencionada previamente
+el programa abortara y le avisara que ingreso mal los argumentos.
 
 Al hacer el paso anterior ya se le crearon las
-4 queries que genera el programa
+6 queries que genera el programa
 
 OPCIONAL:
 6) Si usted decide querer remover los .o

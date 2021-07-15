@@ -36,20 +36,47 @@
 enum filePosition {arch=0, Q1,Q2,Q3,Q4, Q5, Q6};
 enum data {TYPE=0,TITLE,STARTING_YEAR,ENDING_YEAR,GENRES,RATING,VOTES};
 
-//todo comentar estas funciones
+//revisa si los argumentos ingresados son correctos
 int checkarg(int argc,char *argv[],int *year1,int *year2);
+
+//devuelve un string con una linea del csv para poder usarla
 char *getLineNoLimitFile(FILE *arch);
+
+//revisa si los archivos s epudieron abrir correctamente
 void checkopen(FILE **filevec,int queryamount, char * filenames[]);
+
+//transforma un string con varios generos a un vector con strings dentro
 char ** copyGenres(char * genresToDivide, unsigned int * dim);
+
+//Funcion que escribe dentro del archivo de la Q1
 int query1(FILE *arch, imdbADT imdb, unsigned int year);
+
+//Funcion que escribe dentro del archivo de la Q2
 int query2(FILE * arch, imdbADT imdb, unsigned int year);
+
+//Funcion que escribe dentro del archivo de la Q3
 int query3(FILE *arch, imdbADT imdb, unsigned int year);
-void query4(FILE *arch, imdbADT imdb);
-void query5(FILE *arch,imdbADT imdb);
+
+//Funcion que escribe dentro del archivo de la Q4
+int query4(FILE *arch, imdbADT imdb);
+
+//Funcion que escribe dentro del archivo de la Q5
+int query5(FILE *arch,imdbADT imdb);
+
+//Funcion que escribe dentro del archivo de la Q6
 int query6(FILE* arch, imdbADT imdb);
+
+//Cierra todos los archivos que fueron abiertos por el programa
 void closeFiles(FILE **filevec,int queryAmount);
+
+//Saltea una linea del csv, por si no quieres usar la linea de los titulos por ejemplo
 void skipline(FILE *arch);
+
+//Printea un mensaje de error y cierra el programa
 void errorMessage(const char * errMessage, int exitValue);
+
+//Ademas de lo que hace errorMessage, tambien libera toda la memoria usada hasta ese momento
+//y cierra los archivos que se habian abierto
 void errorAbort(imdbADT imdb, FILE * fileVec[], const char * errMessage, int exitValue);
 
 
@@ -78,10 +105,7 @@ int main(int argc,char *argv[])
         errorMessage("No se pude crear el imdb por falta de memoria", errno);
     }
     receiveYears(imdb, year1, year2);
-    //todo guardar los años potentes en el struct
     char * line;
-    //  desconozco si es mas eficiente tener las variables afuera,
-    // pero me hace rudio que se declaremos en todos los ciclos
     while ((line = getLineNoLimitFile(arch)) != NULL) {
         unsigned int startingYear,endingYear, dim=0;
         size_t votes;
@@ -128,6 +152,10 @@ int main(int argc,char *argv[])
             errorAbort(imdb, filevec, "No hay memoria suficiente para guardar mas datos", errno);
         }
     }
+    //esta validacion es del getLineNoLimit del while
+    if(errno==ENOMEM){
+        errorAbort(imdb, filevec, "No hay memoria suficiente para hacer una copia de la linea del csv", errno);
+    }
 
     // codigo para correr las 6 queries
     toBegin(imdb);
@@ -152,8 +180,10 @@ int main(int argc,char *argv[])
     }
     if(!query6(filevec[Q6], imdb))
         errorAbort(imdb, filevec, "Hubo un error en el uso de iteradores dentro de la Q6", errno);
-    query4(filevec[Q4],imdb);
-    query5(filevec[Q5],imdb);
+    if(!query4(filevec[Q4], imdb))
+        errorAbort(imdb, filevec, "Hubo un error en el uso de la Q4", errno);
+    if(!query5(filevec[Q5], imdb))
+        errorAbort(imdb, filevec, "Hubo un error en el uso de la Q5", errno);
     closeFiles(filevec, CANT_FILES);
     freeIMDB(imdb);
     return 0;
@@ -165,7 +195,7 @@ void skipline(FILE *arch)
         ;
 }
 
-void query4(FILE *arch, imdbADT imdb)
+int query4(FILE *arch, imdbADT imdb)
 {
     prepareTop100Movies(imdb);
     int size = getsizeTop100Movies(imdb);
@@ -176,12 +206,15 @@ void query4(FILE *arch, imdbADT imdb)
         float rating;
         char * string;
         getDataFromPositionOfTop100Movies(imdb, i, &string, &startyear, &rating, &cantvotes);
+        if(errno==ENOMEM || errno==EPOS)
+            return NOTOK;
         fprintf(arch, "%u;%s;%u;%.1f\n", startyear, string, cantvotes, rating);
         free(string);
     }
+    return OK;
 }
 
-void query5(FILE *arch,imdbADT imdb)
+int query5(FILE *arch,imdbADT imdb)
 {
     prepareTop100Series(imdb);
     int size = getsizeTop100Series(imdb);
@@ -192,9 +225,12 @@ void query5(FILE *arch,imdbADT imdb)
         float rating;
         char *string;
         getDataFromPositionOfTop100Series(imdb,i,&startyear,&endyear,&rating,&cantvotes,&string);
+        if(errno==ENOMEM || errno==EPOS || errno==ERROR_CODE)
+            return NOTOK;
         fprintf(arch,"%u;%u;%s;%u;%.1f\n",startyear,endyear,string,cantvotes,rating);
         free(string);
     }
+    return OK;
 }
 
 
@@ -333,30 +369,23 @@ char *getLineNoLimitFile(FILE *arch){
             return NULL;
         if (i % BLOCK == 0){
             s = realloc(s, i + BLOCK); // multiplicar por sizeof(char) no es necesario
-            /**controlFlag=checkNULL(s);
-            if(*controlFlag==ERROR_CODE)
-                return NULL;*/
+            if(s==NULL || errno==ENOMEM){
+                errno=ENOMEM;
+                return NULL;
+            }
+
         }
         s[i++] = c;
     }
     s = realloc(s, i + 1); // Liberamos lo que sobra del ultimo bloque
-    /**controlFlag=checkNULL(s);
-    if(*controlFlag==ERROR_CODE)
-        return NULL;*/
+    if(s==NULL || errno==ENOMEM){
+        errno=ENOMEM;
+        return NULL;
+    }
     s[i] = 0;
     return s;
 }
 
-void checkYearFormat(char *strtocheck,int *errorflag){
-    for (int i = 0; strtocheck[i] ; i++){
-        if ( !isdigit(strtocheck[i]) )
-        {
-            //si el string no es un digito propiamente formado, prendo el flag de error code
-            *errorflag = ERROR_CODE;
-            return;
-        }
-    }
-}
 
 // ojo esta funcion
 int checkarg(int argc,char *argv[],int *year1,int *year2){

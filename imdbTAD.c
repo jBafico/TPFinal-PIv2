@@ -229,7 +229,7 @@ static void MPM(imdbADT imdb, tNode newNode, unsigned int startYear){
     newNodeMPM.head.startYear = startYear;
     newNodeMPM.head.title = copy(newNode.title /*, controlFlag*/);
     if(newNodeMPM.head.title==NULL || errno == ENOMEM)
-        return;//todo checkear si esto te bien
+        return;
 
     if (imdb->MPData.movieSize == MP_MAX)
         imdb->MPData.movieFirst = deletefirstM(imdb->MPData.movieFirst);
@@ -278,12 +278,12 @@ static void MPS(imdbADT imdb, tNode newNode, unsigned int startYear, unsigned in
     newNodeMPS.endYear = endYear;
     newNodeMPS.title = copy(newNode.title /*, controlFlag*/);
     if(newNodeMPS.title==NULL || errno == ENOMEM)
-        return;//todo checkear si esto te bien
+        return;
     if (imdb->limitedYear.seriesSize == MP_MAX)
         imdb->limitedYear.seriesFirst = deletefirstS(imdb->limitedYear.seriesFirst);
     else
         imdb->limitedYear.seriesSize++;
-    imdb->limitedYear.seriesFirst = addRecMPS(imdb->limitedYear.seriesFirst, newNodeMPS /*, controlFlag*/);
+    imdb->limitedYear.seriesFirst = addRecMPS(imdb->limitedYear.seriesFirst, newNodeMPS);
 }
 
 static tNode addType(tNode first, tNode node){
@@ -313,7 +313,8 @@ static tListYear addRec(tListYear first, unsigned int year, char *type, tNode no
             newYear->numMovies++;
             for (int i = 0; i < dim; i++){
                 newYear->firstGenre = addRecGenre(newYear->firstGenre, genres[i]);
-                //todo check ERROR
+                if(errno==ENOMEM)
+                    return newYear;
             }
         }
         else if (!strcmp(type, TYPESERIES)){
@@ -322,12 +323,12 @@ static tListYear addRec(tListYear first, unsigned int year, char *type, tNode no
         }
         else{
             free(newYear);
-            //TODO CAMBIAR FLAG A NOT ADDED
+
             return NULL;
         }
         newYear->year = year;
         newYear->tail = first;
-        //TODO CAMBIAR FLAG A ADDED
+
         return newYear;
     }
     if (year == first->year){
@@ -335,10 +336,14 @@ static tListYear addRec(tListYear first, unsigned int year, char *type, tNode no
             first->numMovies++;
             for (int i = 0; i < dim; ++i){
                 first->firstGenre = addRecGenre(first->firstGenre, genres[i]);
-                //todo check ERROR -> addRecGenre ya setea en ENOMEM pero que devolvemos?
+                if(errno==ENOMEM)
+                    return first;
+
             }
             first->mostVotedMovie = addType(first->mostVotedMovie, node);
-            //todo check ERROR o si no se agrego
+            if(errno==ENOMEM)
+                return first;
+
         }
         else if (strcmp(type, TYPESERIES) == 0){ // se agrega una serie
             first->mostVotedSeries = addType(first->mostVotedSeries, node);
@@ -349,7 +354,7 @@ static tListYear addRec(tListYear first, unsigned int year, char *type, tNode no
     first->tail = addRec(first->tail, year, type, node, genres, dim);
     return first;
 }
-//todo que pasa si no cargo año minimo
+
 // donde dim es la dimension del vector de generos
 void add(imdbADT imdb, char *type, char *title, char **genres, int dim, float rating, size_t votes, unsigned int startYear, unsigned int endYear){
     tNode newNode;
@@ -358,18 +363,25 @@ void add(imdbADT imdb, char *type, char *title, char **genres, int dim, float ra
     newNode.title = title;
 
     imdb->first = addRec(imdb->first, startYear, type, newNode, genres, dim);
-    if (!strcmp(type, TYPEMOVIE))
+    if(errno==ENOMEM)
+        return;
+    if (!strcmp(type, TYPEMOVIE)){
         MPM(imdb, newNode, startYear);
+        if(errno==ENOMEM)
+            return;
+    }
 
     if (!strcmp(type, TYPESERIES) && ((imdb->limitedYear.minYear == NO_RESTRICTION || startYear >= imdb->limitedYear.minYear) && (imdb->limitedYear.maxYear == NO_RESTRICTION || startYear <= imdb->limitedYear.maxYear))){
         for (int i = 0; i < dim; ++i)
             imdb->limitedYear.firstGenreRating = addRecGenreRating(imdb->limitedYear.firstGenreRating, genres[i], rating);
 
         MPS(imdb, newNode, startYear, endYear);
+        if(errno==ENOMEM)
+            return;
     }
 }
 
-//HACER FUNCION RECIEVE YEARS Q5 Y Q6 related function
+
 void receiveYears(imdbADT imdb, int startYear, int endYear){
     imdb->limitedYear.minYear = startYear;
     imdb->limitedYear.maxYear = endYear;
@@ -597,10 +609,16 @@ int getsizeTop100Series(imdbADT imdb){
 }
 // pasan NULL SI no quieren algun dato, responsabilidad del front liberar el vector de chars
 int getDataFromPositionOfTop100Series(imdbADT imdb, int position, unsigned int *startYear, unsigned int *endYear, float *rating, unsigned int * cantVotes, char **title){
-    if ( imdb == NULL )
+    if ( imdb == NULL ){
+        errno=ERROR_CODE;
         return ERROR_CODE;
-    if ( position <= 0 || position > imdb->limitedYear.seriesSize )
+    }
+
+    if ( position <= 0 || position > imdb->limitedYear.seriesSize ){
+        errno=EPOS;
         return EPOS;
+    }
+
     if ( imdb->limitedYear.vecInitialized == 0){
         return NOTINITIALIZED;
     }
@@ -611,10 +629,10 @@ int getDataFromPositionOfTop100Series(imdbADT imdb, int position, unsigned int *
     if ( endYear != NULL){
         *endYear = imdb->limitedYear.vec[index]->head.endYear;
     }
-    // ojo con esto todo friar eso
+
     if ( title != NULL ){
         *title = copy(imdb->limitedYear.vec[index]->head.title);
-        if(errno==ENOMEM)
+        if(*title==NULL || errno==ENOMEM)
             return ENOMEM;
     }
     if( rating != NULL ){
@@ -623,7 +641,7 @@ int getDataFromPositionOfTop100Series(imdbADT imdb, int position, unsigned int *
     if ( cantVotes != NULL ){
         *cantVotes = imdb->limitedYear.vec[index]->head.votes;
     }
-    return OK; //todo hacer que retorne algo
+    return OK;
 }
 
 int getsizeTop100Movies(imdbADT imdb){
@@ -651,8 +669,11 @@ void prepareTop100Movies(imdbADT imdb){
 
 void getDataFromPositionOfTop100Movies(imdbADT imdb,int position,char **title,unsigned int *startyear,float *rating,unsigned int *votes)
 {
-    if ( position <= 0 || position > imdb->MPData.movieSize)
+    if ( position <= 0 || position > imdb->MPData.movieSize){
+        errno=EPOS;
         return;
+    }
+
     if ( imdb->MPData.vecinitialized == 0)
     {
         imdb->MPData.vecinitialized = 1;
@@ -661,8 +682,12 @@ void getDataFromPositionOfTop100Movies(imdbADT imdb,int position,char **title,un
     int index = position - 1;
     if ( startyear != NULL )
         *startyear = imdb->MPData.vec[index]->head.startYear;
-    if ( title != NULL )
+    if ( title != NULL ){
         *title = copy(imdb->MPData.vec[index]->head.title);
+        if(*title==NULL || errno==ENOMEM)
+            return;
+    }
+
     if ( rating != NULL )
         *rating = imdb->MPData.vec[index]->head.rating;
     if (votes != NULL)
