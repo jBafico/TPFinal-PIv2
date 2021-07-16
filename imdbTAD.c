@@ -4,8 +4,6 @@
 #include <errno.h>
 
 #define BLOCK 30
-#define MINVOTES 100000 //minima cantidad de votos para entrar en mostPopularList
-#define MP_MAX 100
 #define NULL_EXIT(imdb, ret, value) { if ((imdb) == NULL) { \
                                         errno=(value); \
                                         return (ret); } \
@@ -14,13 +12,14 @@
                                         errno=(value); \
                                         return; } \
                                     }
+
 typedef struct tNodeYear *tListYear;
-typedef struct tNodeMPM *tListMPM; //Most Popular Movies
-typedef struct tNodeMPS *tListMPS; //Most Popular Series
+typedef struct tNodeMPM *tListMPM;
+typedef struct tNodeMPS *tListMPS;
 typedef struct tNodeGenre *tListGenre;
 typedef struct tNodeGenreRating *tListGenreRating;
 
-//Q6 RELATED STRUCT
+// Q6 RELATED STRUCT
 typedef struct tNodeGenreRating{
     char * genre;
     float minRating;
@@ -28,7 +27,7 @@ typedef struct tNodeGenreRating{
     struct tNodeGenreRating *tail;
 } tNodeGenreRating;
 
-//Q5 Y Q6 RELATED STRUCT
+// Q5 Y Q6 RELATED STRUCT
 typedef struct tNodeLimitedYear{
     unsigned int minYear;
     unsigned int maxYear;
@@ -37,24 +36,24 @@ typedef struct tNodeLimitedYear{
     unsigned int seriesSize;    // Dimension de lista de Q5
     tListMPS seriesFirst;       // Lista de q5
     int vecInitialized;         // Flag del vector, marca si esta inicializado o no
-    tListMPS vec[MP_MAX];       // Vector dinamico de tlistMPS, punteros a struct
+    tListMPS *vec;       // Vector dinamico de tlistMPS, punteros a struct
 } tNodeLimitedYear;
 
-//Q2 RELATED STRUCT
+// Q2 RELATED STRUCT
 typedef struct tNodeGenre{
     char *genre;
     unsigned int cantMovies;
     tListGenre tail;
 } tNodeGenre;
 
-//Q3 RELATED STRUCT AND INFO SAVER
+// Q3 RELATED STRUCT AND INFO SAVER
 typedef struct tNode{
     char *title;
     float rating;
     size_t votes;
 } tNode;
 
-//Q1 Q2 Q3 RELATED STRUCT
+// Q1, Q2, Q3 RELATED STRUCT
 typedef struct tNodeYear{
     unsigned int year;
     unsigned int numMovies;
@@ -65,25 +64,25 @@ typedef struct tNodeYear{
     tListGenre firstGenre;
 } tNodeYear;
 
-//Q4 RELATED STRUCT
+// Q4 RELATED STRUCT
 typedef struct tElemMPM{
     char *title;
     unsigned int startYear;
     float rating;
-    unsigned long votes;
+    size_t votes;
 } tElemMPM;
 
-//Q4 RELATED STRUCT
+// Q4 RELATED STRUCT
 typedef struct tNodeMPM{
     tElemMPM head;
     tListMPM tail;
 } tNodeMPM;
 
-//Los siguientes dos structs son parecidos a los anteriores dos structs
-//difieren en que los de abajo contienen endYear al tratarse de series
-//mientras que los de arriba representan peliculas por lo que no tienen ese campo
+// Los siguientes dos structs son parecidos a los anteriores dos
+// Difieren en que los de abajo contienen endYear al tratarse de series
+// Mientras que los de arriba representan peliculas por lo que no tienen ese campo
 
-//Q5 RELATED STRUCT
+// Q5 RELATED STRUCT
 typedef struct tElemMPS{
     char *title;
     unsigned int startYear;
@@ -92,7 +91,7 @@ typedef struct tElemMPS{
     unsigned long votes;
 } tElemMPS;
 
-//Q5 RELATED STRUCT
+// Q5 RELATED STRUCT
 typedef struct tNodeMPS{
     tElemMPS head;
     tListMPS tail;
@@ -103,7 +102,7 @@ typedef struct tMPData{
     unsigned int movieSize; //el tamano de la lista de mostPopular, maximo 100
     tListMPM movieFirst;
     int vecInitialized;
-    tListMPM vec[MP_MAX];
+    tListMPM *vec;
 } tMPData;
 
 //MAIN STRUCT
@@ -113,10 +112,18 @@ typedef struct imdbCDT{
     tMPData MPData;
     tNodeLimitedYear limitedYear;
     tListGenre currentGenre;
+    unsigned int votes; //minima cantidad de votos para poder formar parte de las queries 4 y 5
+    unsigned int topInserted; //tamano maximo de las listas de las queries 4 y 5
 } imdbCDT;
 
-imdbADT new () {
-    return calloc(1, sizeof(imdbCDT));
+imdbADT new (unsigned int minVotes, unsigned int topInserted) {
+     if (minVotes == 0 || topInserted == 0)
+         return NULL;
+     imdbADT new = calloc(1, sizeof(imdbCDT));
+     NULL_EXIT(new, NULL, ERROR_NULL)
+     new->votes = minVotes;
+     new->topInserted = topInserted;
+     return new;
 }
 
 static char * copy(const char *copyFrom) {
@@ -222,10 +229,10 @@ static tListMPM deletefirstM(tListMPM first) {
 }
 
 static void MPM(imdbADT imdb, tNode newNode, unsigned int startYear) {
-    if (newNode.votes < MINVOTES)
+    if (newNode.votes < imdb->votes)
         return;
 
-    if (imdb->MPData.movieSize == MP_MAX && ((imdb->MPData.movieFirst->head.rating > newNode.rating) || ((imdb->MPData.movieFirst->head.rating == newNode.rating) && imdb->MPData.movieFirst->head.votes >= newNode.votes)))
+    if (imdb->MPData.movieSize == imdb->topInserted && ((imdb->MPData.movieFirst->head.rating > newNode.rating) || ((imdb->MPData.movieFirst->head.rating == newNode.rating) && imdb->MPData.movieFirst->head.votes >= newNode.votes)))
         return;
 
     tNodeMPM newNodeMPM;
@@ -236,7 +243,7 @@ static void MPM(imdbADT imdb, tNode newNode, unsigned int startYear) {
     if(newNodeMPM.head.title==NULL || errno == ENOMEM)
         return;
 
-    if (imdb->MPData.movieSize == MP_MAX)
+    if (imdb->MPData.movieSize == imdb->topInserted)
         imdb->MPData.movieFirst = deletefirstM(imdb->MPData.movieFirst);
     else
         imdb->MPData.movieSize++;
@@ -271,9 +278,9 @@ static tListMPS deletefirstS(tListMPS first) {
 static void MPS(imdbADT imdb, tNode newNode, unsigned int startYear, unsigned int endYear)
 {
     // R : se chequea que la serie no haya terminado en este periodo de años, osea que el endig year sea menor que el end posta
-    if (newNode.votes < MINVOTES || ( endYear != 0 && endYear < imdb->limitedYear.minYear) )
+    if (newNode.votes < imdb->votes || ( endYear != 0 && endYear < imdb->limitedYear.minYear) )
         return;
-    if (imdb->limitedYear.seriesSize == MP_MAX && ((imdb->limitedYear.seriesFirst->head.rating > newNode.rating) || ((imdb->limitedYear.seriesFirst->head.rating == newNode.rating) && imdb->limitedYear.seriesFirst->head.votes >= newNode.votes)))
+    if (imdb->limitedYear.seriesSize == imdb->topInserted && ((imdb->limitedYear.seriesFirst->head.rating > newNode.rating) || ((imdb->limitedYear.seriesFirst->head.rating == newNode.rating) && imdb->limitedYear.seriesFirst->head.votes >= newNode.votes)))
         return;
     // R : cambie el tipo de nodo que creabamos, estabamos gastando memoria al pedo porque siempre usabamos .head
     tElemMPS newNodeMPS;
@@ -284,7 +291,7 @@ static void MPS(imdbADT imdb, tNode newNode, unsigned int startYear, unsigned in
     newNodeMPS.title = copy(newNode.title);
     if(newNodeMPS.title==NULL || errno == ENOMEM)
         return;
-    if (imdb->limitedYear.seriesSize == MP_MAX)
+    if (imdb->limitedYear.seriesSize == imdb->topInserted)
         imdb->limitedYear.seriesFirst = deletefirstS(imdb->limitedYear.seriesFirst);
     else
         imdb->limitedYear.seriesSize++;
@@ -302,7 +309,7 @@ static tNode addType(tNode first, tNode node) {
     return first; //no lo supero en votos, devuelvo el que ya estaba
 }
 
-static tListYear addRec(tListYear first, unsigned int year, char *type, tNode node, char **genres, int dim) {
+static tListYear addRec(tListYear first, unsigned int year, char *type, tNode node, char **genres, unsigned int dim) {
     if (first == NULL || year > first->year) {
         tListYear newYear = calloc(1, sizeof(tNodeYear));
         if(newYear==NULL || errno == ENOMEM) {
@@ -361,7 +368,7 @@ static tListYear addRec(tListYear first, unsigned int year, char *type, tNode no
 }
 
 // donde dim es la dimension del vector de generos
-void add(imdbADT imdb, char *type, char *title, char **genres, int dim, float rating, size_t votes, unsigned int startYear, unsigned int endYear) {
+void add(imdbADT imdb, char *type, char *title, char **genres, unsigned int dim, float rating, size_t votes, unsigned int startYear, unsigned int endYear) {
     NULL_EXIT_VOID(imdb, ERROR_NULL)
     tNode newNode;
     newNode.votes = votes;
@@ -423,9 +430,8 @@ static tListYear searchYear(tListYear first, unsigned int year) {
 void toBeginGenre(imdbADT imdb, unsigned int year) {
     NULL_EXIT_VOID(imdb, ERROR_NULL)
     tListYear aux = searchYear(imdb->first, year);
-    if (aux != NULL) {
+    if (aux != NULL)
         imdb->currentGenre = aux->firstGenre;
-    }
     else
         imdb->currentGenre = NULL;
 }
@@ -449,7 +455,7 @@ unsigned int getYear(imdbADT imdb) {
     return imdb->currentYear->year;
 }
 
-char *getGenre(imdbADT imdb) {
+char * getGenre(imdbADT imdb) {
     NULL_EXIT(imdb, NULL, ERROR_NULL)
     NULL_EXIT(imdb->currentGenre, NULL, ERROR_ITERATION)
 
@@ -521,7 +527,7 @@ unsigned int getYearNumSeries(imdbADT imdb) {
     return imdb->currentYear->numSeries;
 }
 
-char *getMostVotedMovieTitle(imdbADT imdb) {
+char * getMostVotedMovieTitle(imdbADT imdb) {
     NULL_EXIT(imdb, NULL, ERROR_NULL)
     NULL_EXIT(imdb->currentYear, NULL, ERROR_ITERATION)
     char *title = copy(imdb->currentYear->mostVotedMovie.title);
@@ -566,7 +572,7 @@ size_t getMostVotedSeriesVotes(imdbADT imdb) {
     return imdb->currentYear->mostVotedSeries.votes;
 }
 
-static void copyTop100SeriesListToVecIterative(tListMPS *vec,unsigned int size,tListMPS list) {
+static void copyTopSeriesListToVecIterative(tListMPS *vec,unsigned int size,tListMPS list) {
     // Relleno vector con iterador auxiliar
     tListMPS aux = list;
     while ( aux != NULL)
@@ -577,14 +583,19 @@ static void copyTop100SeriesListToVecIterative(tListMPS *vec,unsigned int size,t
     }
 }
 
-//por si se cargan mas datos luego de la creacion del vector
-void prepareTop100Series(imdbADT imdb) {
+// Por si se cargan mas datos luego de la creacion del vector
+void prepareTopSeries(imdbADT imdb) {
     NULL_EXIT_VOID(imdb, ERROR_NULL)
-    copyTop100SeriesListToVecIterative(imdb->limitedYear.vec,imdb->limitedYear.seriesSize - 1,imdb->limitedYear.seriesFirst);
+    imdb->limitedYear.vec = realloc(imdb->limitedYear.vec,sizeof(tListMPS) * (imdb->limitedYear.seriesSize));
+    if(imdb->limitedYear.vec == NULL || errno==ENOMEM){
+        errno=ENOMEM;
+        return;
+    }
+    copyTopSeriesListToVecIterative(imdb->limitedYear.vec,imdb->limitedYear.seriesSize - 1,imdb->limitedYear.seriesFirst);
     imdb->limitedYear.vecInitialized = 1;
 }
 
-unsigned int getSizeTop100Series(imdbADT imdb) {
+unsigned int getSizeTopSeries(imdbADT imdb) {
     NULL_EXIT(imdb, NOTOK, ERROR_NULL)
     return imdb->limitedYear.seriesSize;
 }
@@ -651,12 +662,12 @@ char *getMPSTitle(imdbADT imdb,int position) {
     return string;
 }
 
-unsigned int getsizeTop100Movies(imdbADT imdb) {
+unsigned int getSizeTopMovies(imdbADT imdb) {
     NULL_EXIT(imdb,NOTOK, ERROR_NULL)
     return imdb->MPData.movieSize;
 }
 
-static void copyTop100MoviesListToVecIterative(tListMPM *vec, unsigned int size, tListMPM list) {
+static void copyTopMoviesListToVecIterative(tListMPM *vec, unsigned int size, tListMPM list) {
     tListMPM aux = list;
     while( aux != NULL) {
         vec[size] = aux;
@@ -665,9 +676,17 @@ static void copyTop100MoviesListToVecIterative(tListMPM *vec, unsigned int size,
     }
 }
 
-void prepareTop100Movies(imdbADT imdb) {
+void prepareTopMovies(imdbADT imdb) {
     NULL_EXIT_VOID(imdb, ERROR_NULL)
-    copyTop100MoviesListToVecIterative(imdb->MPData.vec,imdb->MPData.movieSize - 1,imdb->MPData.movieFirst);
+    // Uso realloc, si llegase a haber una carga adicional de datos ( que en este TP no va a pasar ) reacomodo la
+    // que ya tengo y sobreescribo, la primera vez entra NULL pues estructura es inicializada con calloc y funciona
+    // como malloc
+    imdb->MPData.vec = realloc(imdb->MPData.vec,sizeof(tListMPM) * (imdb->MPData.movieSize));
+    if(imdb->MPData.vec == NULL || errno==ENOMEM){
+        errno=ENOMEM;
+        return;
+    }
+    copyTopMoviesListToVecIterative(imdb->MPData.vec, imdb->MPData.movieSize - 1, imdb->MPData.movieFirst);
     imdb->MPData.vecInitialized = 1;
 }
 
@@ -687,7 +706,7 @@ float getMPMRating(imdbADT imdb,int position) {
 
 unsigned int getMPMYear(imdbADT imdb,int position) {
     NULL_EXIT(imdb, NOTOK, ERROR_NULL)
-    if ( checkPositionMovie(imdb,position) == ERROR_POS || !checkInitialized(imdb->MPData.vecInitialized) )
+    if (checkPositionMovie(imdb,position) == ERROR_POS || !checkInitialized(imdb->MPData.vecInitialized))
         return NOTOK;
     return imdb->MPData.vec[position - 1]->head.startYear;
 }
@@ -749,8 +768,11 @@ void freeIMDB(imdbADT imdb) {
         return;
     freeRecYear(imdb->first);
     freeMP(imdb->MPData.movieFirst);
+    if (imdb->MPData.vec != NULL)
+        free(imdb->MPData.vec);
     freeGenreRating(imdb->limitedYear.firstGenreRating);
     freeSeries(imdb->limitedYear.seriesFirst);
+    if (imdb->limitedYear.vec != NULL)
+        free(imdb->limitedYear.vec);
     free(imdb);
 }
-

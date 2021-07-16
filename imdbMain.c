@@ -12,6 +12,9 @@
 #define FIRSTYEARPOSITION 2
 #define SECONDYEARPOSITION 3
 
+#define MINVOTES 100000     //Minima cantidad de votos para entrar en mostPopularList
+#define MP_MAX 100          //Tamano maximo de las listas de las query 4 y 5
+
 #define BLOCK 30
 
 #define GENRE_LIM ","
@@ -34,53 +37,53 @@
 enum filePosition {ARCH=0, Q1,Q2,Q3,Q4, Q5, Q6};
 enum data {TYPE=0,TITLE,STARTING_YEAR,ENDING_YEAR,GENRES,RATING,VOTES};
 
-//revisa si los argumentos ingresados son correctos, retorna OK si son validos, NOTOK si no
-int checkarg(int argc,char *argv[],int *year1,int *year2);
+// Revisa si los argumentos ingresados son correctos, retorna OK si son validos, NOTOK si no
+int checkArg(int argc,char *argv[],int *year1,int *year2);
 
-//devuelve un string con una linea del csv para poder usarla
-//retorna NULL si ya llego a EOF
-//retorna NULL y setea errno en ENOMEM si no hay mas memoria
+// Devuelve un string con una linea del csv para poder usarla
+// Retorna NULL si ya llego a EOF
+// Retorna NULL y setea errno en ENOMEM si no hay mas memoria
 char *getLineNoLimitFile(FILE *arch);
 
-//revisa si los archivos se pudieron abrir correctamente, cierra el programa si no
+// Revisa si los archivos se pudieron abrir correctamente, cierra el programa si no
 void checkopen(FILE **filesVec,int queryamount, char * filenames[]);
 
-//transforma un string con varios generos a un vector con strings dentro y lo devuelve
-//retorna NULL y setea errno en ENOMEM si no hay mas memoria
+// Transforma un string con varios generos a un vector con strings dentro y lo devuelve
+// Retorna NULL y setea errno en ENOMEM si no hay mas memoria
 char ** copyGenres(char * genresToDivide, unsigned int * dim);
 
-//Funcion que escribe dentro del archivo de la Q1
-//retorna OK si no hubo ningun error
-//retorna NOTOK si hubo un error de cualquier tipo (validad con errno)
+// Funcion que escribe dentro del archivo de la Q1
+// Retorna OK si no hubo ningun error
+// Retorna NOTOK si hubo un error de cualquier tipo (validad con errno)
 int query1(FILE *arch, imdbADT imdb, unsigned int year);
 
-//Funcion que escribe dentro del archivo de la Q2
-//retorna OK si no hubo ningun error
-//retorna NOTOK si hubo un error de cualquier tipo (validad con errno)
+// Funcion que escribe dentro del archivo de la Q2
+// Retorna OK si no hubo ningun error
+// Retorna NOTOK si hubo un error de cualquier tipo (validad con errno)
 int query2(FILE * arch, imdbADT imdb, unsigned int year);
 
-//Funcion que escribe dentro del archivo de la Q3
-//retorna OK si no hubo ningun error
-//retorna NOTOK si hubo un error de cualquier tipo (validad con errno)
+// Funcion que escribe dentro del archivo de la Q3
+// Retorna OK si no hubo ningun error
+// Retorna NOTOK si hubo un error de cualquier tipo (validad con errno)
 int query3(FILE *arch, imdbADT imdb, unsigned int year);
 
-//Funcion que escribe dentro del archivo de la Q4
-//retorna OK si no hubo ningun error
-//retorna NOTOK si hubo un error de cualquier tipo (validad con errno)
+// Funcion que escribe dentro del archivo de la Q4
+// Retorna OK si no hubo ningun error
+// Retorna NOTOK si hubo un error de cualquier tipo (validad con errno)
 int query4(FILE *arch, imdbADT imdb);
 
-//Funcion que escribe dentro del archivo de la Q5
-//retorna OK si no hubo ningun error
-//retorna NOTOK si hubo un error de cualquier tipo (validad con errno)
+// Funcion que escribe dentro del archivo de la Q5
+// Retorna OK si no hubo ningun error
+// Retorna NOTOK si hubo un error de cualquier tipo (validad con errno)
 int query5(FILE *arch,imdbADT imdb);
 
-//Funcion que escribe dentro del archivo de la Q6
-//retorna OK si no hubo ningun error
-//retorna NOTOK si hubo un error de cualquier tipo (validad con errno)
+// Funcion que escribe dentro del archivo de la Q6
+// Retorna OK si no hubo ningun error
+// Retorna NOTOK si hubo un error de cualquier tipo (validad con errno)
 int query6(FILE* arch, imdbADT imdb);
 
 //Cierra todos los archivos que fueron abiertos por el programa
-void closeFiles(FILE **filesVec,int queryAmount);
+void closeFiles(FILE **filesVec,int fileAmount);
 
 //Saltea una linea del csv, por si no quieres usar la linea de los titulos por ejemplo
 void skipline(FILE *arch);
@@ -92,12 +95,16 @@ void errorMessage(const char * errMessage, int exitValue);
 //y cierra los archivos que se habian abierto
 void errorAbort(imdbADT imdb, FILE * filesVec[], const char * errMessage, int exitValue);
 
+/*
+ * Comentario (1): Luego del primer chequeo de si imdb==NULL despues del new, no se vuelve a revisar esto con errno
+ */
+
 int main(int argc, char *argv[])
 {
-    int year1 = NO_RESTRICTION,year2 = NO_RESTRICTION;
-    if (!checkarg(argc,argv,&year1,&year2)){
+    int year1 = NO_RESTRICTION, year2 = NO_RESTRICTION;
+    if (checkArg(argc,argv,&year1,&year2) != OK){
         //No usamos errorMessage ya que en la consigna especifica lo siguiente:
-        // "[...] se informa en salida estándar que los parámetros son incorrectos y no se procesa la información"
+        // "[...] se informa en salida estandar que los parametros son incorrectos y no se procesa la informacion"
         puts("Argumentos invalidos");
         exit(ERROR_ARG);
     }
@@ -116,12 +123,12 @@ int main(int argc, char *argv[])
 
     skipline(arch);
 
-    imdbADT imdb = new();
+    imdbADT imdb = new(MINVOTES, MP_MAX);
     if(imdb==NULL || errno == ENOMEM){
         closeFiles(filesVec, CANT_FILES);
         errorMessage("No se pude crear el imdb por falta de memoria", errno);
     }
-    receiveYears(imdb, year1, year2);
+    receiveYears(imdb, year1, year2); // Ver Comentario (1)
     char * line;
     while ((line = getLineNoLimitFile(arch)) != NULL) {
         unsigned int startingYear,endingYear, dim=0;
@@ -165,26 +172,27 @@ int main(int argc, char *argv[])
             add(imdb, type, title, genres, dim, rating, votes, startingYear, endingYear);
             free(genres);
         }
-        free(line); //TODO check el free arriba del if(startingYear...) a ver si da error o no
+        free(line);
         if (errno == ENOMEM || errno==ERROR_NULL){
             errorAbort(imdb, filesVec, "No hay memoria suficiente para guardar mas datos", errno);
         }
     }
-    //esta validacion es del getLineNoLimit del while
-    if(errno==ENOMEM){
+    //Esta validacion es del getLineNoLimit del while
+    if(errno==ENOMEM)
         errorAbort(imdb, filesVec, "No hay memoria suficiente para hacer una copia de la linea del csv", errno);
-    }
+
 
     //Codigo para correr las 6 queries
-    toBegin(imdb);
+
+    toBegin(imdb);//Ver comentario (1)
     fprintf(filesVec[Q1], "year;films;series\n");
     fprintf(filesVec[Q2], "%s;%s;%s\n", "year", "genre", "films");
     fprintf(filesVec[Q3], "startYear;film;votesFilm;ratingFilm;serie;votesSerie;ratingSerie\n");
 
     while(hasNext(imdb)){
         unsigned int year=getYear(imdb);
-        if(year==ERROR_ITERATION)
-            errorAbort(imdb, filesVec, "Hubo un error en el uso de iteradores de año", ERROR_ITERATION);
+        if(year==NOTOK)
+            errorAbort(imdb, filesVec, "Hubo un error en el uso de iteradores de año", errno);
         if(!query1(filesVec[Q1], imdb, year))
             errorAbort(imdb, filesVec, "Hubo un error en el uso de iteradores dentro de la Q1", errno);
         if(!query2(filesVec[Q2], imdb, year))
@@ -270,16 +278,16 @@ char *getLineNoLimitFile(FILE *arch){
     return s;
 }
 
-int checkarg(int argc,char *argv[],int *year1,int *year2){
+int checkArg(int argc,char *argv[],int *year1,int *year2){
 
     if (!VALIDARGUMENT(argc))
         return NOTOK;
 
     LOADYEAR(argc, argv, year1, FIRSTYEARPOSITION, ERROR_YEAR)
     LOADYEAR(argc, argv, year2, SECONDYEARPOSITION, ERROR_YEAR)
-    if (argc == ARGWITHYEAR && *year1 > *year2) {
+    if (argc == ARGWITHYEAR && (*year1 > *year2))
         return NOTOK;
-    }
+
     return OK;
 }
 
@@ -297,8 +305,8 @@ void errorAbort(imdbADT imdb, FILE * filesVec[CANT_FILES], const char * errMessa
 int query1(FILE *arch, imdbADT imdb, unsigned int year)
 {
     unsigned int numMovies, numSeries;
-    numMovies= getYearNumMovies(imdb);
-    numSeries= getYearNumSeries(imdb);
+    numMovies= getYearNumMovies(imdb);//Ver comentario (1)
+    numSeries= getYearNumSeries(imdb);//Ver comentario (1)
     if(errno==ERROR_ITERATION)
         return NOTOK;
     fprintf(arch, "%u;%u;%u\n", year, numMovies, numSeries);
@@ -306,14 +314,14 @@ int query1(FILE *arch, imdbADT imdb, unsigned int year)
 }
 
 int query2(FILE * arch, imdbADT imdb, unsigned int year) {
-    toBeginGenre(imdb, year);
+    toBeginGenre(imdb, year);//Ver comentario (1)
     unsigned int cantMovies;
     while(hasNextGenre(imdb)){
-        char * genre=getGenre(imdb);
-        cantMovies= getGenreCant(imdb);
+        char * genre=getGenre(imdb);//Ver comentario (1)
+        cantMovies= getGenreCant(imdb);//Ver comentario (1)
         if(errno==ERROR_ITERATION || errno==ENOMEM)
             return NOTOK;
-        fprintf(arch, "%d;%s;%d\n", year, genre, cantMovies);
+        fprintf(arch, "%u;%s;%u\n", year, genre, cantMovies);
         free(genre);
         nextGenre(imdb);
         if(errno==ERROR_ITERATION){
@@ -325,8 +333,8 @@ int query2(FILE * arch, imdbADT imdb, unsigned int year) {
 
 int query3(FILE *arch, imdbADT imdb, unsigned int year){
     unsigned int numMovies, numSeries;
-    numMovies= getYearNumMovies(imdb);
-    numSeries= getYearNumSeries(imdb);
+    numMovies= getYearNumMovies(imdb);//Ver comentario (1)
+    numSeries= getYearNumSeries(imdb);//Ver comentario (1)
     if(errno==ERROR_ITERATION)
         return NOTOK;
     //El llamado a las funciones que vienen ahora esta hecho de esta manera porque si por ejemplo
@@ -334,6 +342,7 @@ int query3(FILE *arch, imdbADT imdb, unsigned int year){
     //peliculas estarian accediendo a NULL. Al hacerlo de la forma que nosotros implementamos
     //esas situaciones no se presentan.
     if(numMovies == 0) {
+        //Ver comentario (1)
         size_t serieVotes= getMostVotedSeriesVotes(imdb);
         float serieRating= getMostVotedSeriesRating(imdb);
         char * serieTitle= getMostVotedSeriesTitle(imdb);
@@ -343,6 +352,7 @@ int query3(FILE *arch, imdbADT imdb, unsigned int year){
         free(serieTitle);
     }
     else if(numSeries == 0) {
+        //Ver comentario (1)
         size_t movieVotes= getMostVotedMovieVotes(imdb);
         float movieRating= getMostVotedMovieRating(imdb);
         char * movieTitle= getMostVotedMovieTitle(imdb);
@@ -352,6 +362,7 @@ int query3(FILE *arch, imdbADT imdb, unsigned int year){
         free(movieTitle);
     }
     else {
+        //Ver comentario (1)
         size_t serieVotes= getMostVotedSeriesVotes(imdb);
         float serieRating= getMostVotedSeriesRating(imdb);
         size_t movieVotes= getMostVotedMovieVotes(imdb);
@@ -369,21 +380,25 @@ int query3(FILE *arch, imdbADT imdb, unsigned int year){
 
 int query4(FILE *arch, imdbADT imdb)
 {
-    prepareTop100Movies(imdb);
-    int size = getsizeTop100Movies(imdb);
+    prepareTopMovies(imdb);//Ver comentario (1)
+    if(errno==ENOMEM)
+        return NOTOK;
+    unsigned int size = getSizeTopMovies(imdb);//Ver comentario (1)
     fprintf(arch, "startyear;primaryTitle;numVotes;averageRating\n");
     for ( int i = 1; i <= size; i++)
     {
-        unsigned int startyear, cantvotes;
+        unsigned int startYear;
+        size_t cantVotes;
         float rating;
         char * string;
-        startyear = getMPMYear(imdb,i);
-        cantvotes = getMPMVotes(imdb,i);
+        //Ver comentario (1)
+        startYear = getMPMYear(imdb,i);
+        cantVotes = getMPMVotes(imdb,i);
         rating = getMPMRating(imdb,i);
         string = getMPMTitle(imdb,i);
         if(errno==ENOMEM || errno==ERROR_POS || errno==ERROR_NULL || errno==NOT_INITIALIZED)
             return NOTOK;
-        fprintf(arch, "%u;%s;%u;%.1f\n", startyear, string, cantvotes, rating);
+        fprintf(arch, "%u;%s;%lu;%.1f\n", startYear, string, cantVotes, rating);
         free(string);
     }
     return OK;
@@ -391,39 +406,44 @@ int query4(FILE *arch, imdbADT imdb)
 
 int query5(FILE *arch,imdbADT imdb)
 {
-    prepareTop100Series(imdb);
-    int size = getSizeTop100Series(imdb);
+    prepareTopSeries(imdb);//Ver comentario (1)
+    if(errno==ENOMEM)
+        return NOTOK;
+    unsigned int size = getSizeTopSeries(imdb);//Ver comentario (1)
     fprintf(arch,"startYear;endYear;primaryTitle;numVotes;averageRating\n");
     for ( int i = 1; i <= size;i++)
     {
-        unsigned int startyear, endyear, cantvotes;
+        unsigned int startYear, endYear;
+        size_t cantVotes;
         float rating;
         char *string;
-        startyear = getMPSStartYear(imdb,i);
-        endyear = getMPSEndYear(imdb,i);
-        cantvotes = getMPSVotes(imdb,i);
+        //Ver comentario (1)
+        startYear = getMPSStartYear(imdb,i);
+        endYear = getMPSEndYear(imdb,i);
+        cantVotes = getMPSVotes(imdb,i);
         rating = getMPSRating(imdb,i);
         string = getMPSTitle(imdb,i);
         if(errno==ENOMEM || errno==ERROR_POS || errno==ERROR_NULL || errno==NOT_INITIALIZED)
             return NOTOK;
         //En la impresion de esta query tomamos como criterio que si no tenia endYear este sera = 0
-        fprintf(arch,"%u;%u;%s;%u;%.1f\n",startyear,endyear,string,cantvotes,rating);
+        fprintf(arch,"%u;%u;%s;%lu;%.1f\n",startYear,endYear,string,cantVotes,rating);
         free(string);
     }
     return OK;
 }
 
 int query6(FILE* arch, imdbADT imdb){
-    toBeginLimitedGenres(imdb);
+    toBeginLimitedGenres(imdb);//Ver comentario (1)
     fprintf(arch, "%s;%s;%s\n", "genre", "min", "max");
     float min, max;
     while(hasNextLimitedGenres(imdb)){
+        //Ver comentario (1)
         char * genre=getLimitedGenre(imdb);
         min= getLimitedGenreMin(imdb);
         max= getLimitedGenreMax(imdb);
-        if(errno==ERROR_ITERATION || errno==ENOMEM){
+        if(errno==ERROR_ITERATION || errno==ENOMEM)
             return NOTOK;
-        }
+
         fprintf(arch, "%s;%.1f;%.1f\n", genre, min, max);
         free(genre);
         nextLimitedGenres(imdb);
